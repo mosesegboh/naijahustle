@@ -1,0 +1,11 @@
+{
+  "name": "@naija-hustle/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --experimental-strip-types index.mjs"
+  },
+  "dependencies": {
+    "mongodb": "^6.21.0"
+  }
+}
