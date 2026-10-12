@@ -1,6 +1,28 @@
 # MongoDB, GitHub and Heroku
 
-## Order
+## Live application
+
+- Game: https://naija-hustle-72a844a10d13.herokuapp.com/
+- Heroku app: `naija-hustle`, EU region, Heroku-24, one Eco web dyno.
+- Pipeline: https://dashboard.heroku.com/pipelines/311c1b37-5261-4a15-bb1f-b182b41f8e2a
+- GitHub: `mosesegboh/naijahustle`, automatic deployment from `master`.
+- **Wait for CI to pass before deploy** is enabled. Pull-request review apps and Heroku CI are disabled; tests run in GitHub Actions.
+- Atlas connection details are configured privately in Heroku Config Vars. No database credentials belong in Git.
+
+Eco uses the account's existing shared subscription allowance and sleeps when idle.
+The initial deployment was verified with `GET /api/health` returning HTTP 200 and
+`{"ok":true}`, confirming the live server can reach Atlas.
+
+For subsequent releases, finish work on a feature branch, integrate it into `develop`,
+then promote the tested code into `master` and push `master` to GitHub. Heroku builds
+and releases that commit after CI passes. Pushing a feature branch or `develop`
+does not deploy production. Branch protection has not been configured.
+
+Check deployment progress in the Heroku app's **Activity** tab and GitHub **Actions**.
+Use `heroku logs --tail -a naija-hustle` for runtime logs. The local `heroku` Git remote
+is configured, but use GitHub as the normal deployment route so the CI gate applies.
+
+## Setup order for another environment
 
 1. Configure MongoDB and validate the application locally.
 2. Push the tested feature branch to GitHub.
@@ -84,11 +106,11 @@ The MongoDB user needs permissions to read/write the database and create indexes
 In **Deploy → GitHub**, connect `mosesegboh/naijahustle`, select the branch and use
 **Deploy Branch**. Enable automatic deploys and **Wait for CI to pass before deploy**
 once the GitHub checks are green. The initial publication branch is
-`feat/mongodb-heroku`; the normal promotion sequence is feature → develop → master.
+`feat/mongodb-heroku`; production now follows `master`. The normal promotion sequence is feature → develop → master.
 Promotion and branch protection are separate GitHub actions, not automatically
 configured by the workflow file.
 
-Alternatively, after installing and authenticating the Heroku CLI:
+For a separate app without GitHub integration, direct CLI deployment is also possible:
 
 ```sh
 heroku git:remote -a YOUR_EXISTING_APP_NAME
@@ -101,7 +123,7 @@ heroku logs --tail -a YOUR_EXISTING_APP_NAME
 Deploy committed code. A direct Heroku Git push does not run the GitHub CI gate.
 Use `GET /api/health` to check database connectivity after deployment, then register,
 sign in from two browser profiles, win a challenge and restart the dyno. Confirm that
-login and coins survive. No live Heroku app is provisioned by this repository.
+login and coins survive. The existing live app is listed above; these instructions do not provision additional apps automatically.
 
 ## Validation and initial hosting limits
 

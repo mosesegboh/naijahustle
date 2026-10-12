@@ -2,6 +2,10 @@
 
 A browser-first **3D** Nigerian life adventure built with React, TypeScript, Three.js and Zustand. The original [design conversation](https://chatgpt.com/share/6ac92be7-3b80-83ed-8314-0471b184f144) supplied the gameplay foundation; the user's visual references established the newer 3D direction.
 
+Live game: https://naija-hustle-72a844a10d13.herokuapp.com/
+
+Production deploys automatically from `master` after GitHub CI passes. See [deployment details](docs/deployment.md).
+
 ## Run
 
 ```sh
