@@ -74,6 +74,7 @@ try {
   assert.match(js.headers.get("content-type"), /javascript/);
   const auth = await post("/api/auth/register", {
     name: "SmokePlayer",
+    email: "SmokePlayer@example.com",
     password: randomUUID(),
   });
   assert.equal(auth.status, 200);

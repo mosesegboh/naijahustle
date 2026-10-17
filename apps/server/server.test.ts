@@ -86,6 +86,7 @@ describe.each(process.env.MONGODB_TEST_URI ? [false, true] : [false])(
       try {
         const r = await h.request("auth/register", {
           name: "Ada",
+          email: "Ada@example.com",
           password: "a-long-password",
         });
         expect(r.status).toBe(200);
@@ -100,6 +101,7 @@ describe.each(process.env.MONGODB_TEST_URI ? [false, true] : [false])(
           (
             await h.request("auth/login", {
               name: "Ada",
+              email: "Ada@example.com",
               password: "not-the-password",
             })
           ).status,
@@ -108,6 +110,7 @@ describe.each(process.env.MONGODB_TEST_URI ? [false, true] : [false])(
           (
             await h.request("auth/register", {
               name: "ada",
+              email: "ada@example.com",
               password: "a-long-password",
             })
           ).status,
@@ -130,15 +133,78 @@ describe.each(process.env.MONGODB_TEST_URI ? [false, true] : [false])(
         await h.cleanup();
       }
     });
+    it("requires valid unique emails and keeps legacy accounts usable", async () => {
+      const h = await harness(mongo);
+      try {
+        for (const email of [undefined, "bad-email", "a b@example.com"]) {
+          expect(
+            (
+              await h.request("auth/register", {
+                name: "Ada",
+                email,
+                password: "a-long-password",
+              })
+            ).status,
+          ).toBe(400);
+        }
+        const registered = await h.request("auth/register", {
+          name: "Ada",
+          email: "  ADA@Example.com  ",
+          password: "a-long-password",
+        });
+        expect(registered.status).toBe(200);
+        expect(registered.data.user.email).toBe("ada@example.com");
+        const duplicate = await h.request("auth/register", {
+          name: "Different",
+          email: "ADA@example.com",
+          password: "a-long-password",
+        });
+        expect(duplicate.status).toBe(409);
+        const original = await h.store.userByName("Ada");
+        expect(
+          await h.store.createUser({
+            ...original,
+            _id: undefined,
+            id: "legacy-one",
+            name: "LegacyOne",
+            email: undefined,
+            emailKey: undefined,
+          }),
+        ).toBe(true);
+        expect(
+          await h.store.createUser({
+            ...original,
+            _id: undefined,
+            id: "legacy-two",
+            name: "LegacyTwo",
+            email: undefined,
+            emailKey: undefined,
+          }),
+        ).toBe(true);
+        const login = await h.request("auth/login", {
+          name: "LegacyOne",
+          password: "a-long-password",
+        });
+        expect(login.status).toBe(200);
+        await h.restart();
+        expect(
+          (await h.request("me", undefined, registered.cookie)).data.user.email,
+        ).toBe("ada@example.com");
+      } finally {
+        await h.cleanup();
+      }
+    });
     it("shares authenticated positions and removes stale players", async () => {
       const h = await harness(mongo);
       try {
         const a = await h.request("auth/register", {
             name: "Ada",
+            email: "Ada@example.com",
             password: "a-long-password",
           }),
           b = await h.request("auth/register", {
             name: "Tunde",
+            email: "Tunde@example.com",
             password: "a-long-password",
           });
         const pos = { x: 24, z: 18, yaw: 0, view: "city", avatar: "emerald" };
@@ -163,6 +229,7 @@ describe.each(process.env.MONGODB_TEST_URI ? [false, true] : [false])(
       try {
         const a = await h.request("auth/register", {
           name: "Ada",
+          email: "Ada@example.com",
           password: "a-long-password",
         });
         expect(
@@ -199,6 +266,7 @@ describe.each(process.env.MONGODB_TEST_URI ? [false, true] : [false])(
       try {
         const a = await h.request("auth/register", {
           name: "Ada",
+          email: "Ada@example.com",
           password: "a-long-password",
         });
         const started = await h.request("fight/start", { level: 0 }, a.cookie);
@@ -219,6 +287,7 @@ describe.each(process.env.MONGODB_TEST_URI ? [false, true] : [false])(
       try {
         const a = await h.request("auth/register", {
           name: "Ada",
+          email: "Ada@example.com",
           password: "a-long-password",
         });
         await h.request("fight/start", { level: 0 }, a.cookie);
@@ -253,7 +322,11 @@ describe.each(process.env.MONGODB_TEST_URI ? [false, true] : [false])(
       try {
         const results = await Promise.all(
           ["Ada", "ada"].map((name) =>
-            h.request("auth/register", { name, password: "a-long-password" }),
+            h.request("auth/register", {
+              name,
+              email: `${name}@example.com`,
+              password: "a-long-password",
+            }),
           ),
         );
         expect(results.map((r) => r.status).sort()).toEqual([200, 409]);

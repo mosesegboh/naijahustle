@@ -19,13 +19,49 @@ export async function connectStore(
     const users = db.collection("users"),
       sessions = db.collection("sessions"),
       presence = db.collection("presence");
+    const races = db.collection("race_matches");
     await Promise.all([
+      races.createIndex({ id: 1 }, { unique: true }),
+      races.createIndex({ "players.id": 1, created: -1 }),
+      races.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       users.createIndex({ id: 1 }, { unique: true }),
       users.createIndex({ nameKey: 1 }, { unique: true }),
+      users.createIndex(
+        { emailKey: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { emailKey: { $type: "string" } },
+        },
+      ),
       sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       presence.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     ]);
     return {
+      findPlayers: (query, id) =>
+        users
+          .find(
+            { id: { $ne: id }, nameKey: { $regex: "^" + query.toLowerCase() } },
+            { projection: { _id: 0, id: 1, name: 1 } },
+          )
+          .limit(12)
+          .toArray(),
+      race: (id) => races.findOne({ id }),
+      racesFor: (id, now) =>
+        races
+          .find({ "players.id": id, created: { $gt: now - 1800000 } })
+          .sort({ created: -1 })
+          .limit(20)
+          .toArray(),
+      createRace: (m) =>
+        races.insertOne({ ...m, expiresAt: new Date(m.created + 86400000) }),
+      async saveRace(m) {
+        const { _id, revision, ...fields } = m;
+        const r = await races.updateOne(
+          { id: m.id, revision },
+          { $set: fields, $inc: { revision: 1 } },
+        );
+        return r.modifiedCount === 1;
+      },
       close: () => client.close(),
       ping: () => db.command({ ping: 1 }),
       user: (id) => users.findOne({ id }),
@@ -35,6 +71,9 @@ export async function connectStore(
           await users.insertOne({
             ...user,
             nameKey: user.name.toLowerCase(),
+            ...(user.email
+              ? { emailKey: user.email.trim().toLowerCase() }
+              : {}),
             revision: 0,
             fight: null,
           });

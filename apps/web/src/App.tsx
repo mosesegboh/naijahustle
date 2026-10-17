@@ -1,559 +1,539 @@
-import { useEffect, useState } from "react";
-import { AVATARS, NPCS, type Avatar } from "@naija-hustle/shared";
-import { usePlayerStore } from "./stores/playerStore";
+import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
+import ChallengeHub from "./challenges/ChallengeHub";
 import {
-  controlCamera,
-  interactWorld,
-  useWorldStore,
-} from "./stores/worldStore";
-import { TouchControls } from "./components/TouchControls";
-import { Icon, type IconName } from "./components/Icon";
-import { CityLife } from "./features/CityLife";
-import GameCanvas from "./game/GameCanvas";
-export default function App() {
-  const {
-    progress: p,
-    nearby,
-    notice,
-    saveError,
-    start,
-    reset,
-  } = usePlayerStore();
-  const {
-    view,
-    panel,
-    ready,
-    setView,
-    setPanel,
-    street,
-    interaction,
-    location,
-    riding,
-    busInfo,
-    combat,
-  } = useWorldStore();
-  const [name, setName] = useState("");
-  const [avatar, setAvatar] = useState<Avatar>("emerald");
-  const [clean, setClean] = useState(false);
-  useEffect(() => {
-    const close = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPanel(null);
-    };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [setPanel]);
-  const objective =
-    p.mission === "available"
-      ? "Meet Mama Bisi"
-      : p.mission === "active"
-        ? "Deliver to Tunde"
-        : p.journeyCompleted
-          ? "Your city, your story"
-          : "Ride to North Estate";
+  DEFAULT_OPTIONS,
+  type Options,
+  type Match,
+} from "../../../packages/shared/src/race-match";
+const FestivalChallenge = lazy(() => import("./platform/FestivalChallenge"));
+const RacingChallenge = lazy(() => import("./racing/RacingChallenge"));
+import { useSessionStore } from "./stores/sessionStore";
+import "./portal.css";
+
+const artwork = "/images/naija-racer.webp";
+function Brand() {
   return (
-    <main className={`app ${view} ${!p.name ? "onboarding" : ""}`}>
-      <GameCanvas />
-      <CityLife />
-      <div className="vignette" />
-      <header className="topbar glass">
-        <a className="brand" href="./" aria-label="Naija Hustle home">
-          <span className="brand-logo">
-            n<span>h.</span>
-          </span>
-          <span>
-            Naija Hustle<small>EVERYBODY GET STORY</small>
-          </span>
-        </a>
-        <span className="top-divider" />
-        <span className="time-chip">
-          <Icon name="sun" />
-          <span>
-            Golden hour<small>Lagos, Nigeria</small>
-          </span>
-        </span>
-        <span className="session-chip">
-          <i /> {p.name ? "Your story" : "A new beginning"}
-        </span>
-        {p.name ? (
-          <button
-            className="wallet"
-            disabled={combat}
-            onClick={() => setPanel(panel === "profile" ? null : "profile")}
-          >
-            <span className="wallet-icon">₦</span>
-            <strong>₦{p.cash.toLocaleString("en-NG")}</strong>
-            <Icon name="plus" size={16} />
-          </button>
-        ) : (
-          <span className="free-tag">Make yourself at home</span>
-        )}
-      </header>
-      {p.name && (
-        <>
-          {!clean && (
-            <section className="quest-stack">
-              <button
-                className="quest-chip glass"
-                onClick={() => setPanel(panel === "mission" ? null : "mission")}
-              >
-                <span className="quest-icon">
-                  <Icon name={p.journeyCompleted ? "check" : "briefcase"} />
-                </span>
-                <span>
-                  <b>{objective}</b>
-                  <small>
-                    {p.mission === "completed"
-                      ? p.journeyCompleted
-                        ? "Opening chapters complete"
-                        : "Danfo trip · ₦300 arrival bonus"
-                      : "Your first delivery · ₦1,500 reward"}
-                  </small>
-                </span>
-                <Icon name="arrow" size={16} />
-              </button>
-              <div className="location-chip">
-                <Icon name={view === "home" ? "home" : "city"} size={15} />
-                {view === "home" ? "Your apartment · Mainland" : location}
-                <span className="live-dot" />
-              </div>
-            </section>
-          )}
-          <button className="clean-toggle" onClick={() => setClean(!clean)}>
-            {clean ? "Show interface" : "− Hide details"}
-          </button>
-          <button
-            className="street-toggle glass"
-            aria-pressed={street}
-            onClick={() => useWorldStore.setState({ street: !street })}
-          >
-            {street ? "Overview" : "Street view"}
-          </button>
-          {street && (
-            <div className="street-crosshair" aria-hidden="true">
-              +
-            </div>
-          )}
-          {riding && (
-            <div className="ride-info glass" role="status">
-              <b>Danfo ride</b>
-              <span>{busInfo}</span>
-              <small>
-                Get off at a stop · E · route pauses while a panel is open
-              </small>
-            </div>
-          )}
-          <div className="camera-tools glass" aria-label="Camera controls">
-            {(
-              [
-                ["plus", "in", "Zoom in"],
-                ["minus", "out", "Zoom out"],
-                ["rotate", "rotate", "Rotate camera"],
-                ["locate", "center", "Reset camera"],
-              ] as const
-            ).map(([icon, action, label]) => (
-              <button
-                key={action}
-                aria-label={label}
-                title={label}
-                onClick={() => controlCamera(action)}
-              >
-                <Icon name={icon} />
-              </button>
-            ))}
+    <a className="nh-brand" href="#">
+      <span className="nh-mark">
+        N<span>H</span>
+      </span>
+      <span>
+        NAIJA<span>HUSTLE</span>
+      </span>
+    </a>
+  );
+}
+const challenges = [
+  {
+    icon: "🌇",
+    name: "Festival Rush",
+    type: "MULTIPLAYER PLATFORM ADVENTURE",
+    detail:
+      "Leap across Lagos. Collect lantern coins. Bring back the rhythm with your crew.",
+    color: "gold",
+  },
+  {
+    icon: "🏎",
+    name: "Street Kings",
+    type: "KART RACING",
+    detail: "Big drifts. Tight corners. A little Lagos energy.",
+    color: "lime",
+  },
+  {
+    icon: "🚌",
+    name: "Danfo Dash",
+    type: "DANFO RACING",
+    detail: "Your favourite yellow bus. A whole new kind of rush.",
+    color: "gold",
+  },
+  {
+    icon: "🥊",
+    name: "The Ring",
+    type: "BOXING",
+    detail: "Time your moves. Find your rhythm. Own the ring.",
+    color: "pink",
+  },
+  {
+    icon: "🏃",
+    name: "Street Trials",
+    type: "OBSTACLE CHALLENGES",
+    detail: "A test of timing, movement and determination.",
+    color: "blue",
+  },
+  {
+    icon: "💬",
+    name: "The Hangout",
+    type: "SOCIAL WORLD",
+    detail: "Meet other players and find your people.",
+    color: "pink",
+  },
+  {
+    icon: "🏡",
+    name: "Your Virtual Life",
+    type: "LIFE SIMULATION",
+    detail: "Build your identity. Make this world your own.",
+    color: "lime",
+  },
+];
+export default function App() {
+  const { user, restore, auth, logout, busy, error } = useSessionStore();
+  const [raceOptions, setRaceOptions] = useState<Options>(DEFAULT_OPTIONS);
+  const [match, setMatch] = useState<Match | undefined>();
+  const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<"register" | "login">("register");
+  const [showPassword, setShowPassword] = useState(false);
+  const [tab, setTab] = useState("overview");
+  useEffect(() => {
+    void restore().finally(() => setReady(true));
+  }, [restore]);
+  function switchMode() {
+    setMode(mode === "register" ? "login" : "register");
+    setShowPassword(false);
+    useSessionStore.setState({ error: "" });
+  }
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    await auth(
+      mode,
+      String(values.get("username")),
+      String(values.get("password")),
+      String(values.get("email") ?? ""),
+    );
+    setTab("overview");
+  }
+  if (!ready)
+    return (
+      <main className="nh-loading">
+        <Brand />
+        <p role="status">Getting your garage ready…</p>
+      </main>
+    );
+  if (!user)
+    return (
+      <main className="nh-auth">
+        <section className="nh-auth-art">
+          <Brand />
+          <div className="nh-auth-head">
+            <span className="nh-eyebrow">MADE OF NAIJA ENERGY</span>
+            <h1>
+              Your streets.
+              <br />
+              Your story.
+              <br />
+              <em>Your hustle.</em>
+            </h1>
+            <p>
+              A virtual world for friends, challengers and
+              <br className="nh-desktop" /> everyday legends. Your journey
+              starts here.
+            </p>
           </div>
-          {!clean && (
-            <div className="scene-caption">
-              <span className="eyebrow">
-                {view === "home"
-                  ? "A PLACE TO CALL YOUR OWN"
-                  : "THE CITY IS CALLING"}
-              </span>
-              <h1>
-                {view === "home"
-                  ? "Small room. Big dreams."
-                  : view === "interior"
-                    ? location
-                    : "Find your next hustle."}
-              </h1>
+          <img
+            className="nh-auth-racer"
+            src={artwork}
+            alt="Nigerian racer in a green jacket beside a yellow danfo-inspired racing kart"
+          />
+          <div className="nh-art-caption">
+            <span>01 / YOUR VIRTUAL WORLD</span>
+            <span>CHARACTER CONCEPT ↗</span>
+          </div>
+        </section>
+        <section className="nh-auth-form">
+          <div className="nh-form-top">
+            <span className="nh-pill">EARLY ACCESS</span>
+            <span>BUILT FOR THE BOLD.</span>
+          </div>
+          <div className="nh-form-inner">
+            <span className="nh-eyebrow">YOUR NEXT CHAPTER</span>
+            <h2>
+              {mode === "register" ? "Join the hustle." : "Back for more?"}
+            </h2>
+            <p>
+              {mode === "register"
+                ? "Create your player profile. Make a name for yourself."
+                : "Sign in and pick up where you left off."}
+            </p>
+            <form key={mode} onSubmit={submit}>
+              <label htmlFor="username">
+                Username <span>YOUR PLAYER NAME</span>
+              </label>
+              <input
+                id="username"
+                name="username"
+                placeholder="e.g. LagosLegend"
+                autoComplete="username"
+                required
+                minLength={3}
+                maxLength={20}
+                pattern="[A-Za-z0-9_]{3,20}"
+                title="3–20 letters, numbers or underscores"
+              />
+              {mode === "register" && (
+                <>
+                  <label htmlFor="email">Email address</label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    required
+                    maxLength={254}
+                  />
+                </>
+              )}
+              <label htmlFor="password">Password</label>
+              <div className="nh-password">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="At least 10 characters"
+                  autoComplete={
+                    mode === "register" ? "new-password" : "current-password"
+                  }
+                  required
+                  minLength={10}
+                  maxLength={128}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+              <small className="nh-field-note">
+                {mode === "register"
+                  ? "Username: 3–20 letters, numbers or underscores. Password: 10+ characters."
+                  : "Use the username you registered with."}
+              </small>
+              {error && (
+                <p className="nh-error" role="alert">
+                  {error}
+                </p>
+              )}
+              <button className="nh-primary" disabled={busy}>
+                {busy
+                  ? "One moment…"
+                  : mode === "register"
+                    ? "Create my player"
+                    : "Let's go"}
+                <span aria-hidden="true">↗</span>
+              </button>
+            </form>
+            <p className="nh-switch">
+              {mode === "register"
+                ? "Already part of the crew?"
+                : "New to the neighbourhood?"}{" "}
+              <button disabled={busy} onClick={switchMode}>
+                {mode === "register" ? "Sign in" : "Create an account"}
+              </button>
+            </p>
+            <div className="nh-auth-note">
+              <span>✦</span>
               <p>
-                {view === "home"
-                  ? "Every great story starts somewhere."
-                  : view === "interior"
-                    ? "Explore inside. Your street is just outside."
-                    : "New faces, familiar streets. Make your move."}
+                One profile. A world of possibilities.
+                <br />
+                <small>A virtual life. Challenges. Rewards.</small>
               </p>
             </div>
-          )}
-          {!clean && (
-            <div className="player-card glass">
-              <div className={`portrait ${p.avatar}`}>
-                <span className="portrait-head" />
-                <span className="portrait-body" />
-              </div>
-              <div className="player-detail">
-                <b>
-                  {p.name}
-                  <span>Rookie</span>
-                </b>
-                <div className="vitals">
-                  <span title={`Energy ${p.energy} of 100`}>
-                    <Icon name="energy" size={14} />
-                    <meter
-                      aria-label="Energy"
-                      min={0}
-                      max={100}
-                      value={p.energy}
-                    />
-                  </span>
-                  <span title={`Health ${p.health} of 100`}>
-                    <Icon name="heart" size={14} />
-                    <meter
-                      aria-label="Health"
-                      min={0}
-                      max={100}
-                      value={p.health}
-                    />
-                  </span>
-                  <span title={`Reputation ${p.reputation}`}>
-                    <Icon name="star" size={14} />
-                    {p.reputation}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-          <nav className="dock glass" aria-label="Game navigation">
-            {(
-              [
-                {
-                  icon: "home",
-                  label: "Home",
-                  active: view === "home" && !panel,
-                  action: () => setView("home"),
-                },
-                {
-                  icon: "city",
-                  label: "City",
-                  active: view === "city" && !panel,
-                  action: () => setView("city"),
-                },
-                {
-                  icon: "briefcase",
-                  label: "Hustles",
-                  active: panel === "mission",
-                  action: () =>
-                    setPanel(panel === "mission" ? null : "mission"),
-                },
-                {
-                  icon: "user",
-                  label: "Profile",
-                  active: panel === "profile",
-                  action: () =>
-                    setPanel(panel === "profile" ? null : "profile"),
-                },
-              ] as {
-                icon: IconName;
-                label: string;
-                active: boolean;
-                action: () => void;
-              }[]
-            ).map((item) => (
-              <button
-                key={item.label}
-                disabled={
-                  riding && (item.label === "Home" || item.label === "City")
-                }
-                onClick={item.action}
-                className={item.active ? "active" : ""}
-              >
-                <Icon name={item.icon} />
-                <span>{item.label}</span>
-                {item.label === "Hustles" && p.mission !== "completed" && <i />}
-              </button>
-            ))}
-          </nav>
-          <button
-            className="help-button glass"
-            disabled={combat}
-            aria-label="How to play"
-            onClick={() => setPanel(panel === "help" ? null : "help")}
-          >
-            <Icon name="help" />
-          </button>
-          <div className="movement">
-            <TouchControls />
           </div>
-          {(interaction || (view === "city" && nearby && !riding)) && (
-            <button className="interact-button" onClick={interactWorld}>
-              <kbd>E</kbd>{" "}
-              {interaction ||
-                `Talk to ${NPCS.find((n) => n.id === nearby)?.name}`}
-              <Icon name="arrow" size={17} />
-            </button>
-          )}
-          {view !== "city" && !clean && (
-            <button className="leave-home" onClick={() => setView("city")}>
-              Head into the city <Icon name="arrow" size={16} />
-            </button>
-          )}
-          <div className="save-note">
-            {saveError
-              ? "Saving unavailable this session"
-              : "Saved on this device"}
-            <span>·</span> Virtual cash
-          </div>
-          {notice !==
-            "Find Mama Bisi by the market to begin your first hustle." &&
-            view === "city" &&
-            !panel &&
-            !riding && (
-              <div className="street-toast glass" role="status">
-                <span className="toast-icon">
-                  <Icon name="briefcase" />
-                </span>
-                <p>{notice}</p>
-              </div>
-            )}
-        </>
-      )}
-      {!p.name && (
-        <section className="welcome-card glass">
-          <span className="eyebrow">YOUR STORY STARTS HERE</span>
-          <h1>
-            Welcome to your
-            <br />
-            <em>next chapter.</em>
-          </h1>
-          <p>
-            A little space in Lagos. A city full of possibilities.
-            <br />
-            Let’s see what you make of it.
-          </p>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              start(name, avatar);
-            }}
-          >
-            <label htmlFor="name">What should we call you?</label>
-            <input
-              autoComplete="nickname"
-              id="name"
-              maxLength={24}
-              required
-              placeholder="Your street name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <fieldset>
-              <legend>Pick your colour</legend>
-              <div className="avatars">
-                {(Object.keys(AVATARS) as Avatar[]).map((a) => (
-                  <button
-                    type="button"
-                    aria-label={a}
-                    aria-pressed={avatar === a}
-                    key={a}
-                    className={`${a} ${avatar === a ? "selected" : ""}`}
-                    onClick={() => setAvatar(a)}
-                  >
-                    <span />
-                    {avatar === a && <Icon name="check" size={14} />}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            <button className="primary" disabled={!name.trim() || !ready}>
-              Enter the neighbourhood
-              <Icon name="arrow" size={18} />
-            </button>
-          </form>
-          <small>Free to explore · your progress stays on this device</small>
+          <footer className="nh-form-footer">
+            <span>NAIJA HUSTLE © {new Date().getFullYear()}</span>
+            <span>PLAY YOUR OWN WAY.</span>
+          </footer>
         </section>
-      )}
-      {panel && panel !== "social" && p.name && (
-        <div className="panel-backdrop" onClick={() => setPanel(null)}>
-          <section
-            className="detail-panel glass"
-            role="dialog"
-            aria-modal="true"
-            aria-label={
-              panel === "mission"
-                ? "Your hustles"
-                : panel === "profile"
-                  ? "Player profile"
-                  : "How to play"
-            }
-            onClick={(e) => e.stopPropagation()}
+      </main>
+    );
+  if (tab === "festival")
+    return (
+      <Suspense
+        fallback={<main className="nh-loading">Opening Festival Rush…</main>}
+      >
+        <FestivalChallenge
+          userId={user.id}
+          name={user.name}
+          onExit={() => {
+            setTab("overview");
+            void restore();
+          }}
+        />
+      </Suspense>
+    );
+  if (tab === "racing")
+    return (
+      <Suspense
+        fallback={
+          <main className="nh-loading">
+            <p role="status">Opening Street Kings…</p>
+          </main>
+        }
+      >
+        <RacingChallenge
+          name={user.name}
+          userId={user.id}
+          options={raceOptions}
+          match={match}
+          onExit={() => {
+            setTab("overview");
+            void restore();
+          }}
+        />
+      </Suspense>
+    );
+  return (
+    <div className="nh-dashboard">
+      <aside className="nh-sidebar">
+        <Brand />
+        <span className="nh-menu-label">YOUR PLAYGROUND</span>
+        <nav aria-label="Main navigation">
+          <button
+            className={tab === "overview" ? "active" : ""}
+            onClick={() => setTab("overview")}
           >
-            <button
-              className="panel-close"
-              aria-label="Close panel"
-              onClick={() => setPanel(null)}
-              autoFocus
-            >
-              <Icon name="close" />
-            </button>
-            {panel === "mission" ? (
-              <>
-                <span className="panel-symbol">
-                  <Icon name="briefcase" size={28} />
-                </span>
-                <span className="eyebrow">YOUR HUSTLE BOARD</span>
-                <h2>From one room to your own business.</h2>
-                <p>
-                  You arrived in Lagos with ₦5,000 and a small room. Earn your
-                  neighbours’ trust, learn the city, and work toward a business
-                  of your own.
-                </p>
-                <h3>Chapter 1 · A favour for Mama</h3>
-                <p>
-                  {p.mission === "available"
-                    ? "Mama Bisi has a parcel and needs someone she can count on. Find her outside Balogun Market to get started."
-                    : p.mission === "active"
-                      ? "Parcel collected! Tunde is waiting outside the compound. Take it to him and collect your first pay."
-                      : "You made the delivery. A little cash, a little reputation, and a new connection in the neighbourhood."}
-                </p>
-                <div className="mission-reward">
-                  <Icon name="coin" size={26} />
-                  <b>
-                    ₦1,500<small>Delivery reward</small>
-                  </b>
-                  <span>+10 reputation</span>
-                </div>
-                <ol className="mission-steps">
-                  <li className={p.mission !== "available" ? "done" : ""}>
-                    <span>1</span>Talk to Mama Bisi at the market
-                  </li>
-                  <li className={p.mission === "completed" ? "done" : ""}>
-                    <span>2</span>Deliver the parcel to Tunde
-                  </li>
-                </ol>
-                <h3>Chapter 2 · Learn the route</h3>
-                <p>
-                  {p.journeyCompleted
-                    ? "North Estate reached. Opening chapters complete!"
-                    : "After the delivery, board the marked danfo just east of the central crossroads. Ride through East Junction to North Estate. Fare: ₦200; first arrival bonus: ₦300 and 5 reputation."}
-                </p>
-                <p className="muted">
-                  Next planned chapter: saving for and running your first
-                  business. Building interiors are explorable; shop and banking
-                  services will follow.
-                </p>
-                <div className="mission-status" role="status">
-                  {notice}
-                </div>
-                <button className="primary" onClick={() => setView("city")}>
-                  Explore the city
-                  <Icon name="arrow" />
-                </button>
-              </>
-            ) : panel === "profile" ? (
-              <>
-                <span className="panel-symbol">
-                  <Icon name="user" size={28} />
-                </span>
-                <span className="eyebrow">YOUR LAGOS STORY</span>
-                <h2>{p.name}</h2>
-                <p>Rookie hustler. Big things start with small steps.</p>
-                <div className="profile-grid">
-                  <div>
-                    <small>Hustle cash</small>
-                    <b>₦{p.cash.toLocaleString("en-NG")}</b>
-                  </div>
-                  <div>
-                    <small>Reputation</small>
-                    <b>{p.reputation} REP</b>
-                  </div>
-                  <div>
-                    <small>Health</small>
-                    <b>{p.health}/100</b>
-                  </div>
-                  <div>
-                    <small>Energy</small>
-                    <b>{p.energy}/100</b>
-                  </div>
-                </div>
-                <p className="muted">
-                  This is your local game profile. Cash is virtual; accounts and
-                  withdrawals are not available.
-                </p>
-                <button
-                  className="reset-button"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "Start a new story? This clears your local progress.",
-                      )
-                    ) {
-                      reset();
-                      setView("home");
-                    }
-                  }}
-                >
-                  Start a new story
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="panel-symbol">
-                  <Icon name="help" size={28} />
-                </span>
-                <span className="eyebrow">MAKE YOURSELF AT HOME</span>
-                <h2>Your world. Your pace.</h2>
-                <div className="help-rows">
-                  <p>
-                    <b>Move around</b>
-                    <span>
-                      WASD, arrow keys or the touch pad. You can also click an
-                      open spot on the ground to walk there.
-                    </span>
-                  </p>
-                  <p>
-                    <b>Look around</b>
-                    <span>
-                      Drag to rotate. Scroll or pinch to zoom. Right-drag or use
-                      two fingers to pan.
-                    </span>
-                  </p>
-                  <p>
-                    <b>Start your first hustle</b>
-                    <span>
-                      Open City and find Mama Bisi’s green marker. Get close and
-                      press E or Talk.
-                    </span>
-                  </p>
-                  <p>
-                    <b>Find your bearings</b>
-                    <span>
-                      Walk toward an ENTER marker and press E or the action
-                      button. Exit using the door or Head into the city.
-                      Neighbourhoods load as you explore.
-                    </span>
-                  </p>
-                  <p>
-                    <b>Street view</b>
-                    <span>
-                      Use Street view to see through your character’s eyes. Drag
-                      to look; WASD or the touch pad moves you. Switch to
-                      Overview for click-to-walk.
-                    </span>
-                  </p>
-                  <p>
-                    <b>Ride a danfo</b>
-                    <span>
-                      The marked bus starts east of the central crossroads.
-                      Approach and press E to pay ₦200. Get off with E during an
-                      eight-second stop. Home and City shortcuts are unavailable
-                      during a ride.
-                    </span>
-                  </p>
-                </div>
-              </>
-            )}
-          </section>
+            <span>◈</span> Overview
+          </button>
+          <a href="#challenges" onClick={() => setTab("overview")}>
+            <span>⚑</span> Challenges <small>NEW</small>
+          </a>
+          <button
+            className={tab === "profile" ? "active" : ""}
+            onClick={() => setTab("profile")}
+          >
+            <span>◎</span> My profile
+          </button>
+        </nav>
+        <div className="nh-sidebar-note">
+          <span>✦</span>
+          <h3>Day one energy.</h3>
+          <p>
+            You're here at the beginning. Let's build something worth playing.
+          </p>
+          <span className="nh-pill">STARTER EDITION</span>
         </div>
-      )}
-    </main>
+        <button
+          className="nh-signout"
+          disabled={busy}
+          onClick={() => void logout()}
+        >
+          {busy ? "Signing out…" : "↪  Sign out"}
+        </button>
+      </aside>
+      <div className="nh-main">
+        <header className="nh-topbar">
+          <span>
+            THE PLAYGROUND{" "}
+            <span className="nh-muted">
+              / {tab === "profile" ? "MY PROFILE" : "OVERVIEW"}
+            </span>
+          </span>
+          <div className="nh-top-player">
+            <span className="nh-wallet">
+              ◉ {user.coins.toLocaleString()} <small>COINS</small>
+            </span>
+            <span className="nh-avatar" aria-hidden="true">
+              {user.name.slice(0, 2).toUpperCase()}
+            </span>
+            <strong>{user.name}</strong>
+          </div>
+        </header>
+        <main className="nh-content">
+          {error && (
+            <p className="nh-error" role="alert">
+              {error}
+            </p>
+          )}
+          {tab === "profile" ? (
+            <section className="nh-profile">
+              <span className="nh-eyebrow">PLAYER IDENTITY</span>
+              <h1>Your name. Your legacy.</h1>
+              <div className="nh-profile-card">
+                <span className="nh-avatar">
+                  {user.name.slice(0, 2).toUpperCase()}
+                </span>
+                <h2>{user.name}</h2>
+                <p>{user.email ?? "Legacy account · no email on file"}</p>
+                <dl>
+                  <div>
+                    <dt>Coins</dt>
+                    <dd>{user.coins.toLocaleString()}</dd>
+                  </div>
+                  <div>
+                    <dt>Wins</dt>
+                    <dd>{user.wins}</dd>
+                  </div>
+                  <div>
+                    <dt>Challenge level</dt>
+                    <dd>{user.level + 1}</dd>
+                  </div>
+                </dl>
+                <p>
+                  Your username identifies you above your kart in crew matches.
+                </p>
+              </div>
+              <button className="nh-primary" onClick={() => setTab("overview")}>
+                Back to the playground <span>↗</span>
+              </button>
+            </section>
+          ) : (
+            <>
+              <div className="nh-welcome">
+                <div>
+                  <span className="nh-eyebrow">GOOD TO HAVE YOU HERE</span>
+                  <h1>
+                    Welcome, {user.name}
+                    <span className="nh-accent">.</span>
+                  </h1>
+                </div>
+                <span className="nh-pill">✦ YOUR STORY STARTS NOW</span>
+              </div>
+              <section className="nh-hero">
+                <div className="nh-hero-copy">
+                  <span className="nh-dark-label">
+                    LIVE. CONNECT. PLAY. EARN.
+                  </span>
+                  <h2>
+                    Your world.
+                    <br />
+                    Your <em>hustle.</em>
+                  </h2>
+                  <p>
+                    Build your virtual life, meet other players and take on
+                    challenges in a world full of Nigerian energy.
+                  </p>
+                  <a className="nh-primary" href="#campaign">
+                    Enter the campaign <span>↗</span>
+                  </a>
+                </div>
+                <img
+                  src={artwork}
+                  alt="Street King racer and yellow danfo-inspired kart concept"
+                />
+                <span className="nh-hero-tag">
+                  A GLIMPSE OF THE WORLD / CONCEPT PREVIEW
+                </span>
+              </section>
+              <ChallengeHub
+                userId={user.id}
+                onPlay={(options, match) => {
+                  setRaceOptions(options);
+                  setMatch(match);
+                  setTab("racing");
+                }}
+              />
+              <section className="nh-stats" aria-label="Your progress">
+                <div>
+                  <span className="nh-stat-icon">◉</span>
+                  <div>
+                    <span>Your coins</span>
+                    <strong>
+                      {user.coins.toLocaleString()} <small>COINS</small>
+                    </strong>
+                  </div>
+                </div>
+                <div>
+                  <span className="nh-stat-icon">♜</span>
+                  <div>
+                    <span>Challenges won</span>
+                    <strong>
+                      {user.wins} <small>VICTORIES</small>
+                    </strong>
+                  </div>
+                </div>
+                <div>
+                  <span className="nh-stat-icon">⚑</span>
+                  <div>
+                    <span>Your journey</span>
+                    <strong>
+                      {user.wins ? "On the rise" : "Just getting started"}
+                    </strong>
+                  </div>
+                </div>
+              </section>
+              <section id="challenges" className="nh-challenges">
+                <div className="nh-section-title">
+                  <div>
+                    <span className="nh-eyebrow">MANY WAYS TO PLAY</span>
+                    <h2>Find your next challenge.</h2>
+                  </div>
+                  <span className="nh-muted">
+                    Street Kings: crew matches ready
+                  </span>
+                </div>
+                <div className="nh-challenge-grid">
+                  {challenges.map((c) => (
+                    <article className={`nh-challenge ${c.color}`} key={c.name}>
+                      <div className="nh-challenge-art">
+                        <span aria-hidden="true">{c.icon}</span>
+                        <span className="nh-coming">
+                          {["Street Kings", "Festival Rush"].includes(c.name)
+                            ? "CREW MATCHES READY"
+                            : "COMING SOON"}
+                        </span>
+                      </div>
+                      <div className="nh-challenge-copy">
+                        <span className="nh-eyebrow">{c.type}</span>
+                        <h3>{c.name}</h3>
+                        <p>{c.detail}</p>
+                        {c.name === "Festival Rush" && (
+                          <button
+                            className="nh-primary nh-play-race"
+                            onClick={() => setTab("festival")}
+                          >
+                            Open Festival Rush <span>↗</span>
+                          </button>
+                        )}
+                        {c.name === "Street Kings" && (
+                          <button
+                            className="nh-primary nh-play-race"
+                            onClick={() => {
+                              setMatch(undefined);
+                              setRaceOptions(DEFAULT_OPTIONS);
+                              setTab("racing");
+                            }}
+                          >
+                            Open Street Kings <span>↗</span>
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+              <section className="nh-about">
+                <span className="nh-about-symbol">↗</span>
+                <div>
+                  <span className="nh-eyebrow">A WORLD OF POSSIBILITIES</span>
+                  <h2>Live your story. Make your mark.</h2>
+                  <p>
+                    Naija Hustle is a browser-based social simulation: a virtual
+                    world where you can meet people, build your identity,
+                    compete in different challenges and earn rewards. Racing is
+                    one of many planned activities, alongside boxing, obstacle
+                    courses and social experiences. Accounts are ready now; try
+                    the Street Kings 3D test drive while more gameplay and
+                    earning features are developed.
+                  </p>
+                </div>
+                <span className="nh-about-stamp">
+                  MADE FOR
+                  <br />
+                  <strong>NAIJA</strong>
+                  <br />
+                  PLAYED EVERYWHERE
+                </span>
+              </section>
+              <footer className="nh-dashboard-footer">
+                You're in early. Accounts and profiles are ready; new game modes
+                are coming next.
+              </footer>
+            </>
+          )}
+        </main>
+      </div>
+    </div>
   );
 }

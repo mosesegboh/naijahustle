@@ -9,6 +9,7 @@ import {
 interface User {
   id: string;
   name: string;
+  email?: string;
   coins: number;
   level: number;
   wins: number;
@@ -55,7 +56,12 @@ interface SessionState {
   practice: boolean;
   practiceLevel: number;
   restore: () => Promise<void>;
-  auth: (mode: string, name: string, password: string) => Promise<void>;
+  auth: (
+    mode: string,
+    name: string,
+    password: string,
+    email?: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   startFight: (level: number) => Promise<void>;
   action: (action: FightAction) => Promise<void>;
@@ -91,11 +97,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ connected: false });
     }
   },
-  auth: async (mode, name, password) => {
+  auth: async (mode, name, password, email) => {
     if (get().busy) return;
     set({ busy: true, error: "" });
     try {
-      const data = await api("auth/" + mode, { name, password });
+      const data = await api("auth/" + mode, { name, password, email });
       set({
         user: data.user,
         connected: true,
@@ -109,11 +115,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
   logout: async () => {
+    if (get().busy) return;
+    set({ busy: true, error: "" });
     try {
       await api("auth/logout", {});
       set({ user: null, peers: [], online: 0, fight: null, error: "" });
     } catch (e) {
       set({ error: (e as Error).message });
+    } finally {
+      set({ busy: false });
     }
   },
   startFight: async (level) => {

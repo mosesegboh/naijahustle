@@ -1,10 +1,38 @@
 // Test double only. Application startup always connects to MongoDB.
 export function memoryStore() {
+  const races = new Map();
   const users = new Map(),
     sessions = new Map(),
     presence = new Map();
   const copy = (v) => (v ? structuredClone(v) : null);
   return {
+    findPlayers: async (query, id) =>
+      [...users.values()]
+        .filter(
+          (p) =>
+            p.id !== id && p.name.toLowerCase().startsWith(query.toLowerCase()),
+        )
+        .slice(0, 12)
+        .map(({ id, name }) => ({ id, name })),
+    race: async (id) => copy(races.get(id)),
+    racesFor: async (id, now) =>
+      copy(
+        [...races.values()]
+          .filter(
+            (m) =>
+              m.created > now - 1800000 && m.players.some((p) => p.id === id),
+          )
+          .reverse()
+          .slice(0, 20),
+      ),
+    createRace: async (m) => {
+      races.set(m.id, copy(m));
+    },
+    saveRace: async (m) => {
+      if (races.get(m.id)?.revision !== m.revision) return false;
+      races.set(m.id, { ...copy(m), revision: m.revision + 1 });
+      return true;
+    },
     close: async () => {},
     ping: async () => {},
     user: async (id) => copy(users.get(id)),
@@ -17,7 +45,9 @@ export function memoryStore() {
     async createUser(user) {
       if (
         [...users.values()].some(
-          (u) => u.name.toLowerCase() === user.name.toLowerCase(),
+          (u) =>
+            u.name.toLowerCase() === user.name.toLowerCase() ||
+            (user.email && u.email?.toLowerCase() === user.email.toLowerCase()),
         )
       )
         return false;

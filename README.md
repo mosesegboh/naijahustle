@@ -1,5 +1,9 @@
 # Naija Hustle
 
+The current entry point is the new account and starter dashboard experience for a Nigerian-inspired social simulation and challenge world. Register with a username, email and password, or sign in with an existing username. The dashboard shows saved coins, wins, a profile and previews of future activities. Street Kings includes solo practice and invited 2–4-player crew matches with server-verified 50-coin winner rewards. The Lagos Afterglow campaign hub provides story briefings, game options and username invitations. Other challenge types remain previews. The previous world implementation is retained in `apps/web/src/LegacyGame.tsx` for future integration.
+
+New registrations require unique email addresses (case-insensitive). Existing accounts without email remain supported. MongoDB creates the partial unique email index at startup. Email verification and password recovery are not part of this initial authentication flow.
+
 A browser-first **3D** Nigerian life adventure built with React, TypeScript, Three.js and Zustand. The original [design conversation](https://chatgpt.com/share/6ac92be7-3b80-83ed-8314-0471b184f144) supplied the gameplay foundation; the user's visual references established the newer 3D direction.
 
 Live game: https://naija-hustle-72a844a10d13.herokuapp.com/
@@ -87,3 +91,39 @@ Traffic now follows separate lanes, junction signals and clearance checks. The p
 MongoDB persists accounts, sessions, active fights, challenge coins and reward history. Online presence also uses MongoDB with expiry. Fight state and rewards save atomically with revision checks, preventing duplicate coin awards from concurrent requests. Existing browser exploration saves remain unchanged.
 
 The production Node entrypoint serves the web build and API from one origin. Heroku startup, environment configuration, GitHub deployment, direct local deployment and Ubuntu setup are covered in [the deployment guide](docs/deployment.md). Run `npm run build` then `npm start` for a local production-build preview. Real-money withdrawals and conversion remain disabled.
+
+## Street Kings graphics milestone
+
+Open **Challenges → Open Street Kings** after signing in. Drag to orbit the kart, scroll or pinch to zoom, choose paint, then select **Take a test drive**. Drive with WASD/arrows, hold Shift to tighten a turn, press E for a charged boost, R to reset, and Escape to return to inspection. Touch driving controls are included. High graphics enables dynamic shadows; Light reduces rendering cost. The scene includes colourful rounded shop façades, balconies, arched windows, fuller palms, continuous kerbs, and a patterned driver outfit. **Show player names** toggles your signed-in username above the driver and remembers the setting on this browser. Crew matches render remote racers with their own username labels.
+
+This milestone follows the graphics-first reference: imported CC0 kart and rigged human models, a posed driver, physical materials, a Lagos-inspired waterfront circuit, and an actual WebGL renderer. It does not claim to match the concept image. The first multiplayer implementation uses HTTP polling and server-controlled simulation. Asset provenance and modifications are documented in `apps/web/public/models/racing/CREDITS.md`.
+
+## Lagos Afterglow crew challenges
+
+Open the campaign on the dashboard. Choose circuit, target battle or obstacle mode, laps, difficulty and a gadget. Search usernames, select 1–3 rivals and send invitations. Invited players accept from their dashboard; the host starts when at least two players have accepted. Others select **Join race**. Space or the gadget button fires/activates the weapon. Cyan pads boost; pink barrels slow you; gold targets score points. Follow the illuminated checkpoint arch.
+
+Solo practice is free and unrewarded. A crew winner earns 50 account coins; ties, timeouts without a winner and cancelled matches pay nothing. No wagers or real-money conversion are enabled. Matches, invitations and rewards persist in MongoDB. Restart the API after updating so it creates the race collection indexes.
+
+See [the complete campaign and match rules](docs/lagos-afterglow.md) for the story, map sectors, gameplay, disconnect rules and current limitations.
+
+### Test on a phone over Wi-Fi
+
+Run `npm run dev` on your computer. Connect your phone to the same Wi-Fi and open
+`http://YOUR_COMPUTER_WIFI_IP:5173` in its browser (for example,
+`http://192.168.1.20:5173`). On Ubuntu, find the Wi-Fi IPv4 address in Settings →
+Wi-Fi → connection details, or run `hostname -I`. Use the Wi-Fi address, not a
+Docker/VPN address. Vite prints the available Network URLs when it starts.
+`localhost` on a phone refers to the phone, not your computer.
+
+The development server already listens on all interfaces and proxies `/api` to
+the backend `PORT` configured in the root `.env` (default 3001), so phone requests use the same origin; no `.env` change is needed.
+If the page cannot load, check that port 5173 is allowed on your trusted local
+network and that your router does not isolate Wi-Fi clients. Keep the computer
+and development server running. Landscape mode gives the race controls more room.
+
+During a race, tap **Drive** to toggle acceleration, hold the left/right pad to
+steer, and hold **Brake** to slow down and switch Drive off. **Boost** can be held
+with steering. The fourth button fires your equipped weapon (Shoot, Trap or
+Shield). Controls support multiple fingers and reset when the page loses focus.
+Keyboard controls remain available. Open **Settings** to adjust graphics and
+username labels while driving.

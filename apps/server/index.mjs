@@ -1,4 +1,6 @@
 import http from "node:http";
+import { platformService } from "./platform-service.mjs";
+import { raceService } from "./race-service.mjs";
 import {
   randomBytes,
   scryptSync,
@@ -24,9 +26,12 @@ export function createGameService({
 } = {}) {
   if (!store) throw new Error("A database store is required");
   const limits = new Map();
+  const races = raceService(store);
+  const festival = platformService(store);
   const publicUser = (u) => ({
     id: u.id,
     name: u.name,
+    email: u.email,
     coins: u.coins,
     level: u.level,
     wins: u.wins,
@@ -95,7 +100,14 @@ export function createGameService({
       const limit = limits.get(bucket) ?? { count: 0, until: now + 60000 };
       limit.count++;
       limits.set(bucket, limit);
-      if (limit.count > (bucket.startsWith("auth:") ? 30 : 1500))
+      if (
+        limit.count >
+        (bucket.startsWith("auth:")
+          ? 30
+          : ["/api/races/action", "/api/festival/action"].includes(path)
+            ? 3000
+            : 1500)
+      )
         return send(429, { error: "Too many requests. Try again shortly." });
       let body = {};
       if (req.method === "POST") {
@@ -146,11 +158,18 @@ export function createGameService({
           });
         let u = await store.userByName(name);
         if (path.endsWith("register")) {
+          const email =
+            typeof body.email === "string"
+              ? body.email.trim().toLowerCase()
+              : "";
+          if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+            return send(400, { error: "Enter a valid email address." });
           if (u) return send(409, { error: "That username is taken." });
           const salt = randomBytes(16).toString("hex");
           u = {
             id: randomBytes(16).toString("hex"),
             name,
+            email,
             salt,
             hash: scryptSync(password, salt, 64).toString("hex"),
             coins: 0,
@@ -159,7 +178,9 @@ export function createGameService({
             ledger: [],
           };
           if (!(await store.createUser(u)))
-            return send(409, { error: "That username is taken." });
+            return send(409, {
+              error: "That username or email is already registered.",
+            });
         } else {
           const hash = scryptSync(
             password,
@@ -182,6 +203,10 @@ export function createGameService({
       }
       if (!user)
         return send(401, { error: "Sign in to join the shared city." });
+      if (await festival({ path, method: req.method, body, user, now, send }))
+        return;
+      if (await races({ path, method: req.method, body, user, now, send }))
+        return;
       if (path === "/api/auth/logout" && req.method === "POST") {
         await store.deleteSession(digest(token));
         await store.deletePresence(user.id);
