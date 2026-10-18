@@ -1,0 +1,143 @@
+.nh-commerce {
+  max-width: 1100px;
+  margin: auto;
+}
+.nh-commerce h1 {
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  margin: 12px 0 30px;
+}
+.nh-commerce-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.nh-commerce-card {
+  background: #172431;
+  border: 1px solid #344451;
+  border-radius: 24px;
+  padding: 25px;
+  margin-bottom: 22px;
+  color: #edf6e7;
+}
+.nh-commerce-card h2 {
+  margin-top: 0;
+}
+.nh-commerce p,
+.nh-commerce small {
+  color: #b8c8cf;
+  line-height: 1.6;
+}
+.nh-commerce label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.nh-commerce input,
+.nh-commerce textarea,
+.nh-commerce select {
+  box-sizing: border-box;
+  width: 100%;
+  border-radius: 12px;
+  padding: 13px;
+  color: #fff;
+  background: #0c1723;
+  border: 1px solid #536772;
+  font: inherit;
+}
+.nh-commerce button,
+.nh-billboard button,
+.nh-billboard a {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 20px;
+  background: #f4cc63;
+  color: #172431;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  min-height: 44px;
+}
+.nh-commerce button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.nh-commerce small {
+  display: block;
+  margin-top: 12px;
+}
+.nh-commerce dt {
+  color: #9fb8bd;
+}
+.nh-commerce dd {
+  margin: 8px 0 20px;
+  font-size: 1.3rem;
+}
+.nh-ad-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #344451;
+  padding: 18px 0;
+  margin-bottom: 18px;
+}
+.nh-ad-order > div {
+  flex: 1;
+  min-width: 180px;
+  overflow-wrap: anywhere;
+}
+.nh-ad-order a {
+  color: #7be3c3;
+}
+.nh-commerce-message {
+  background: #293a4a;
+  padding: 16px;
+  border-radius: 12px;
+}
+.nh-billboard {
+  position: relative;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+  border: 1px solid #52a8a1;
+  padding: 28px;
+  border-radius: 24px;
+  margin: 26px 0;
+  background:
+    repeating-linear-gradient(125deg, #ffffff06 0 18px, transparent 18px 35px),
+    linear-gradient(120deg, #12565b, #163345);
+  color: #fff5d9;
+}
+.nh-billboard.gold {
+  background-color: #694b19;
+  background-image: linear-gradient(120deg, #715127, #30294e);
+}
+.nh-billboard.pink {
+  background-image: linear-gradient(120deg, #773a64, #30294e);
+}
+.nh-billboard > div {
+  flex: 1;
+  min-width: 180px;
+}
+.nh-billboard h2 {
+  margin: 10px 0;
+}
+.nh-billboard p {
+  line-height: 1.5;
+}
+.nh-billboard .nh-ad-small {
+  background: transparent;
+  color: #fff;
+  font-size: 0.8rem;
+}
+@media (max-width: 650px) {
+  .nh-commerce-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .nh-commerce-card {
+    padding: 20px;
+  }
+}

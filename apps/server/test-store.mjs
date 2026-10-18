@@ -1,11 +1,50 @@
 // Test double only. Application startup always connects to MongoDB.
 export function memoryStore() {
   const races = new Map();
+  const ads = new Map(),
+    views = new Set();
+  let economy = null;
   const users = new Map(),
     sessions = new Map(),
     presence = new Map();
   const copy = (v) => (v ? structuredClone(v) : null);
   return {
+    economy: async () => copy(economy),
+    saveEconomy: async (value) => {
+      if ((economy?.revision || 0) !== value.revision) return false;
+      economy = { ...copy(value), revision: value.revision + 1 };
+      return true;
+    },
+    ad: async (id) => copy(ads.get(id)),
+    adByReference: async (ref) =>
+      copy([...ads.values()].find((a) => a.txRef === ref)),
+    ownedAds: async (owner) =>
+      copy([...ads.values()].filter((a) => a.owner === owner)),
+    reviewAds: async () =>
+      copy([...ads.values()].filter((a) => a.status === "review")),
+    activeAds: async (now) =>
+      copy(
+        [...ads.values()].filter(
+          (a) => a.status === "active" && a.expiresAt > now,
+        ),
+      ),
+    createAd: async (ad) => {
+      ads.set(ad.id, copy(ad));
+    },
+    patchAd: async (id, condition, fields) => {
+      const ad = ads.get(id);
+      if (!ad || !Object.entries(condition).every(([k, v]) => ad[k] === v))
+        return false;
+      ads.set(id, { ...ad, ...copy(fields) });
+      return true;
+    },
+    impression: async (id, viewer, day) => {
+      const key = `${id}:${viewer}:${day}`;
+      if (!views.has(key)) {
+        views.add(key);
+        ads.get(id).impressions++;
+      }
+    },
     findPlayers: async (query, id) =>
       [...users.values()]
         .filter(

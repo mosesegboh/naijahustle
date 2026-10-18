@@ -1,4 +1,5 @@
 import http from "node:http";
+import { commerceService } from "./commerce.mjs";
 import { platformService } from "./platform-service.mjs";
 import { raceService } from "./race-service.mjs";
 import {
@@ -28,6 +29,7 @@ export function createGameService({
   const limits = new Map();
   const races = raceService(store);
   const festival = platformService(store);
+  const commerce = commerceService(store);
   const publicUser = (u) => ({
     id: u.id,
     name: u.name,
@@ -203,6 +205,8 @@ export function createGameService({
       }
       if (!user)
         return send(401, { error: "Sign in to join the shared city." });
+      if (await commerce({ path, method: req.method, body, user, now, send }))
+        return;
       if (await festival({ path, method: req.method, body, user, now, send }))
         return;
       if (await races({ path, method: req.method, body, user, now, send }))

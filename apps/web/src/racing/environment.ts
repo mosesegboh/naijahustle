@@ -632,6 +632,159 @@ export function buildEnvironment(
       scene.add(cloud);
     }
   }
+  // Trackside neighbourhood pockets: open-front kiosks, benches and spectators.
+  // Each pocket is offset beyond the paved shoulder and faces the circuit.
+  for (let i = 0; i < 10; i++) {
+    const t = ((i + 0.45) / 10) * TAU,
+      p = track(t),
+      yaw = tangent(t);
+    const pocket = new THREE.Group();
+    pocket.position.set(p.x + Math.cos(yaw) * 17, 0, p.z - Math.sin(yaw) * 17);
+    pocket.rotation.y = yaw + Math.PI / 2;
+    scene.add(pocket);
+    const paint = material(colors[i % colors.length]);
+    box(5.5, 0.25, 4.5, pavement, 0, 0.1, 0, pocket);
+    box(4.6, 2.6, 0.3, paint, 0, 1.5, -1.7, pocket);
+    for (const x of [-2.1, 2.1]) box(0.16, 3.2, 0.16, dark, x, 1.6, 1, pocket);
+    box(4.8, 0.2, 3.3, white, 0, 3.3, -0.2, pocket);
+    for (let stripe = 0; stripe < 8; stripe++) {
+      box(
+        0.6,
+        0.08,
+        3.3,
+        stripe % 2 ? paint : white,
+        -2.1 + stripe * 0.6,
+        3.43,
+        -0.2,
+        pocket,
+      );
+      box(
+        0.6,
+        0.45,
+        0.12,
+        stripe % 2 ? paint : white,
+        -2.1 + stripe * 0.6,
+        3.12,
+        1.45,
+        pocket,
+      );
+    }
+    box(4, 1.15, 0.7, material(0xb57e50), 0, 0.7, 0.6, pocket);
+    for (let k = 0; k < 5; k++) {
+      const fruit = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 8, 6),
+        material([0xf4b640, 0xe66d48, 0x78ad50][k % 3]),
+      );
+      fruit.position.set(-1.4 + k * 0.7, 1.45, 0.6);
+      pocket.add(fruit);
+    }
+    const board = sign(
+      [
+        "SUYA CORNER",
+        "EKO RECORDS",
+        "FRESH ZOBO",
+        "MARINA CAFE",
+        "LAGOS THREADS",
+      ][i % 5],
+      "LOCAL FLAVOUR / GOOD VIBES",
+      3.5,
+      0.85,
+      0,
+      2.5,
+      -1.48,
+    );
+    pocket.add(board);
+    // Slatted benches and litter bins anchor each little plaza.
+    for (let slat = 0; slat < 4; slat++)
+      box(2.5, 0.1, 0.13, material(0xb57e50), 4, 0.65, slat * 0.18, pocket);
+    box(2.5, 0.75, 0.12, material(0xb57e50), 4, 1.1, -0.15, pocket);
+    for (const x of [3, 5]) box(0.15, 0.65, 0.55, dark, x, 0.32, 0.25, pocket);
+    box(0.55, 0.8, 0.55, material(0x208e8b), -3, 0.4, 0.1, pocket);
+    for (let k = 0; k < 3; k++) {
+      const person = new THREE.Group();
+      person.position.set(-2 + k * 1.7, 0, 3);
+      pocket.add(person);
+      box(
+        0.43,
+        0.7,
+        0.3,
+        material(colors[(i + k + 2) % 6]),
+        0,
+        1.05,
+        0,
+        person,
+      );
+      for (const side of [-1, 1]) {
+        box(0.14, 0.65, 0.16, dark, side * 0.13, 0.38, 0, person);
+        const arm = box(
+          0.12,
+          0.6,
+          0.14,
+          material(0x875636),
+          side * 0.3,
+          1.1,
+          0,
+          person,
+        );
+        arm.rotation.z = side * 0.28;
+      }
+      const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.24, 10, 8),
+        material(0x875636),
+      );
+      head.position.y = 1.65;
+      person.add(head);
+      const hair = new THREE.Mesh(
+        new THREE.SphereGeometry(0.25, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+        dark,
+      );
+      hair.position.y = 1.68;
+      person.add(hair);
+    }
+  }
+  // A sculptural lagoon fountain gives the central island a recognisable landmark.
+  for (const [radius, height, y, color] of [
+    [8, 0.5, 0.15, 0xe6caa3],
+    [6.8, 0.22, 0.45, 0x41b8bd],
+    [2.4, 1.1, 0.8, 0xe6caa3],
+    [1.7, 0.2, 1.4, 0x65d7d3],
+  ] as const) {
+    const basin = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, height, 48),
+      material(color, 0.35),
+    );
+    basin.position.set(0, y, 0);
+    scene.add(basin);
+  }
+  const sculpture = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(1.5, 0.28, 64, 8),
+    material(0xf7c75f, 0.28),
+  );
+  sculpture.position.set(0, 3.6, 0);
+  scene.add(sculpture);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU;
+    const jet = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.09, 2.4, 6),
+      material(0xa1ede1, 0.2),
+    );
+    jet.position.set(Math.sin(a) * 3, 1.8, Math.cos(a) * 3);
+    jet.rotation.z = Math.sin(a) * 0.25;
+    scene.add(jet);
+  }
+  // Promenade pergolas and potted flowering trees occupy the quiet infield.
+  for (const side of [-1, 1]) {
+    const x = side * 20;
+    for (const dx of [-4, 4])
+      for (const dz of [-2, 2]) box(0.25, 4, 0.25, white, x + dx, 2, dz);
+    for (let k = 0; k < 9; k++)
+      box(0.35, 0.25, 5, material(0xb57e50), x - 4 + k, 4, 0);
+    for (const z of [-6, 6]) {
+      box(1.5, 0.8, 1.5, material(0xc78262), x, 0.4, z);
+      box(0.25, 3, 0.25, material(0x886148), x, 1.8, z);
+      foliage(x, 3.3, z, 1.6, material(side === 1 ? 0xe995bc : 0x69b582));
+    }
+  }
   // Batch static scenery by material to keep browser draw-call cost small.
   scene.updateMatrixWorld(true);
   const batches = new Map<THREE.Material, THREE.Mesh[]>();

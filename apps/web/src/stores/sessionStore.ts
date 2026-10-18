@@ -29,7 +29,7 @@ export async function api(path: string, body?: unknown) {
     credentials: "same-origin",
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(path.startsWith("commerce/") ? 20000 : 5000),
   });
   const data = await response.json().catch(() => ({
     error: "Game server unavailable. Start the server to sign in.",

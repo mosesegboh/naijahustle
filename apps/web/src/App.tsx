@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
+import Commerce, { Billboard } from "./commerce/Commerce";
 import ChallengeHub from "./challenges/ChallengeHub";
 import {
   DEFAULT_OPTIONS,
@@ -82,7 +83,11 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<"register" | "login">("register");
   const [showPassword, setShowPassword] = useState(false);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState(
+    new URLSearchParams(location.search).has("payment")
+      ? "commerce"
+      : "overview",
+  );
   useEffect(() => {
     void restore().finally(() => setReady(true));
   }, [restore]);
@@ -291,6 +296,12 @@ export default function App() {
         <span className="nh-menu-label">YOUR PLAYGROUND</span>
         <nav aria-label="Main navigation">
           <button
+            className={tab === "commerce" ? "active" : ""}
+            onClick={() => setTab("commerce")}
+          >
+            <span>◉</span> Wallet & adverts
+          </button>
+          <button
             className={tab === "overview" ? "active" : ""}
             onClick={() => setTab("overview")}
           >
@@ -327,7 +338,12 @@ export default function App() {
           <span>
             THE PLAYGROUND{" "}
             <span className="nh-muted">
-              / {tab === "profile" ? "MY PROFILE" : "OVERVIEW"}
+              /{" "}
+              {tab === "profile"
+                ? "MY PROFILE"
+                : tab === "commerce"
+                  ? "WALLET & ADVERTS"
+                  : "OVERVIEW"}
             </span>
           </span>
           <div className="nh-top-player">
@@ -346,7 +362,9 @@ export default function App() {
               {error}
             </p>
           )}
-          {tab === "profile" ? (
+          {tab === "commerce" ? (
+            <Commerce />
+          ) : tab === "profile" ? (
             <section className="nh-profile">
               <span className="nh-eyebrow">PLAYER IDENTITY</span>
               <h1>Your name. Your legacy.</h1>
@@ -503,6 +521,7 @@ export default function App() {
                   ))}
                 </div>
               </section>
+              <Billboard onOpen={() => setTab("commerce")} />
               <section className="nh-about">
                 <span className="nh-about-symbol">↗</span>
                 <div>

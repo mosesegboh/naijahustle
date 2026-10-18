@@ -20,7 +20,15 @@ export async function connectStore(
       sessions = db.collection("sessions"),
       presence = db.collection("presence");
     const races = db.collection("race_matches");
+    const ads = db.collection("advertisements"),
+      config = db.collection("economy_settings"),
+      views = db.collection("ad_impressions");
     await Promise.all([
+      ads.createIndex({ id: 1 }, { unique: true }),
+      ads.createIndex({ txRef: 1 }, { unique: true, sparse: true }),
+      ads.createIndex({ transactionId: 1 }, { unique: true, sparse: true }),
+      views.createIndex({ ad: 1, viewer: 1, day: 1 }, { unique: true }),
+      views.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
       races.createIndex({ id: 1 }, { unique: true }),
       races.createIndex({ "players.id": 1, created: -1 }),
       races.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
@@ -37,6 +45,62 @@ export async function connectStore(
       presence.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     ]);
     return {
+      economy: () => config.findOne({ _id: "main" }),
+      async saveEconomy(value) {
+        const { revision, ...fields } = value;
+        try {
+          const r = await config.updateOne(
+            { _id: "main", revision },
+            { $set: fields, $inc: { revision: 1 } },
+            { upsert: revision === 0 },
+          );
+          return !!(r.modifiedCount || r.upsertedCount);
+        } catch (e) {
+          if (e.code === 11000) return false;
+          throw e;
+        }
+      },
+      ad: (id) => ads.findOne({ id }),
+      adByReference: (txRef) => ads.findOne({ txRef }),
+      ownedAds: (owner) =>
+        ads.find({ owner }).sort({ created: -1 }).limit(100).toArray(),
+      reviewAds: () =>
+        ads
+          .find({ status: "review" })
+          .sort({ created: 1 })
+          .limit(100)
+          .toArray(),
+      activeAds: (now) =>
+        ads
+          .find({ status: "active", expiresAt: { $gt: now } })
+          .limit(100)
+          .toArray(),
+      createAd: (ad) => ads.insertOne(ad),
+      async patchAd(id, condition, fields) {
+        const r = await ads.updateOne({ id, ...condition }, { $set: fields });
+        return r.modifiedCount === 1;
+      },
+      async impression(ad, viewer, day) {
+        // A transaction keeps the daily de-duplication record and count together.
+        const session = client.startSession();
+        try {
+          await session.withTransaction(async () => {
+            await views.insertOne(
+              { ad, viewer, day, expiresAt: new Date((day + 31) * 86400000) },
+              { session },
+            );
+            await ads.updateOne(
+              { id: ad },
+              { $inc: { impressions: 1 } },
+              { session },
+            );
+          });
+        } catch (e) {
+          if (e.code !== 11000) throw e;
+        } finally {
+          await session.endSession();
+        }
+      },
       findPlayers: (query, id) =>
         users
           .find(

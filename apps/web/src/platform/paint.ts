@@ -1,3 +1,4 @@
+import { festivalScenery } from "./scenery";
 import {
   platforms,
   coins,
@@ -62,19 +63,30 @@ export function paint(
   // Original festival bunting and shopfronts: three distinct neighbourhoods.
   for (let i = 0; i < 17; i++) {
     const x = i * 240;
+    const roofY = 205 + (i % 4) * 13;
     ctx.fillStyle = ["#ce718c", "#d5a34d", "#628d83"][Math.floor(x / 1250)];
     ctx.beginPath();
-    ctx.roundRect(x, 232, 180, 208, [14, 14, 0, 0]);
+    ctx.roundRect(x, roofY, 180, 440 - roofY, [14, 14, 0, 0]);
     ctx.fill();
     const shade = ctx.createLinearGradient(x, 0, x + 180, 0);
     shade.addColorStop(0, "#ffffff15");
     shade.addColorStop(1, "#28203350");
     ctx.fillStyle = shade;
-    ctx.fillRect(x, 245, 180, 195);
+    ctx.fillRect(x, roofY + 10, 180, 430 - roofY);
     ctx.fillStyle = "#ffe7bd";
-    ctx.fillRect(x - 4, 230, 188, 8);
+    ctx.fillRect(x - 4, roofY - 2, 188, 8);
     ctx.fillStyle = "#604362";
-    ctx.fillRect(x + 15, 220, 150, 10);
+    ctx.fillRect(x + 15, roofY - 12, 150, 10);
+    if (i % 3 === 0) {
+      ctx.fillStyle = "#526073";
+      ctx.beginPath();
+      ctx.ellipse(x + 125, roofY - 25, 19, 10, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(x + 120, roofY - 25, 3, 19);
+    }
+    ctx.fillStyle = "#f4d59f55";
+    for (let stripe = 0; stripe < 6; stripe++)
+      ctx.fillRect(x + stripe * 30, roofY + 10, 2, 430 - roofY);
     ctx.fillStyle = "#392f56";
     ctx.fillRect(x + 25, 310, 48, 130);
     ctx.fillRect(x + 100, 285, 46, 55);
@@ -106,9 +118,25 @@ export function paint(
     ctx.fillStyle = "#fff3d0";
     ctx.font = "bold 14px sans-serif";
     ctx.fillText(
-      ["BISI'S MARKET", "CANAL WALK", "ROOFTOP RHYTHM"][
-        Math.min(2, Math.floor(x / 1250))
-      ],
+      [
+        "BISI’S MARKET",
+        "EKO TAILORS",
+        "ZOBŌ & CO",
+        "SUYA JUNCTION",
+        "RECORD HOUSE",
+        "LAGOON CAFE",
+        "CANAL WALK",
+        "BOAT WORKS",
+        "MARINA BOOKS",
+        "FRESH CATCH",
+        "PALM TERRACE",
+        "ROOFTOP RHYTHM",
+        "MUSIC YARD",
+        "SKY GARDEN",
+        "DRUM CLUB",
+        "SUNSET STUDIO",
+        "FESTIVAL HALL",
+      ][i],
       x + 10,
       260,
     );
@@ -126,6 +154,7 @@ export function paint(
       ctx.fill();
     }
   }
+  festivalScenery(ctx, camera, view, time);
   for (const [x, y, w] of platforms) {
     ctx.fillStyle = "#50354c";
     ctx.fillRect(x, y, w, y === 440 ? 120 : 20);
