@@ -1,3 +1,4 @@
+import AdvertiseBanner from "../commerce/AdvertiseBanner";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -632,6 +633,7 @@ export default function RacingChallenge({
         </button>
       )}
       <div ref={mount} className="race-view" />
+      <AdvertiseBanner game />
       <div
         ref={nameplate}
         className="race-nameplate"

@@ -1,3 +1,4 @@
+import AdvertiseBanner from "../commerce/AdvertiseBanner";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../stores/sessionStore";
 import {
@@ -312,7 +313,7 @@ export default function FestivalChallenge({
         <button onClick={() => (match ? void leave() : onExit())}>
           ← {match ? "Leave run" : "Dashboard"}
         </button>
-        <span>NAIJA HUSTLE / CHALLENGES</span>
+        <AdvertiseBanner game />
         <b>✦ FESTIVAL RUSH</b>
       </header>
       {error && (

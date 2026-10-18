@@ -37,7 +37,9 @@ try {
   const { user } = await r.json();
   process.env.ADMIN_USER_IDS = user.id;
   await page.goto(base);
-  await page.getByRole("button", { name: "Wallet & adverts" }).click();
+  await page
+    .getByRole("link", { name: "Advertise here. Open the advertising desk." })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Your rewards. Your reach." }),
   ).toBeVisible();

@@ -1,3 +1,4 @@
+import AdvertiseBanner from "./commerce/AdvertiseBanner";
 import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
 import Commerce, { Billboard } from "./commerce/Commerce";
 import ChallengeHub from "./challenges/ChallengeHub";
@@ -84,7 +85,8 @@ export default function App() {
   const [mode, setMode] = useState<"register" | "login">("register");
   const [showPassword, setShowPassword] = useState(false);
   const [tab, setTab] = useState(
-    new URLSearchParams(location.search).has("payment")
+    new URLSearchParams(location.search).has("payment") ||
+      new URLSearchParams(location.search).has("advertise")
       ? "commerce"
       : "overview",
   );
@@ -105,7 +107,11 @@ export default function App() {
       String(values.get("password")),
       String(values.get("email") ?? ""),
     );
-    setTab("overview");
+    setTab(
+      new URLSearchParams(location.search).has("advertise")
+        ? "commerce"
+        : "overview",
+    );
   }
   if (!ready)
     return (
@@ -408,6 +414,7 @@ export default function App() {
                 </div>
                 <span className="nh-pill">✦ YOUR STORY STARTS NOW</span>
               </div>
+              <AdvertiseBanner />
               <section className="nh-hero">
                 <div className="nh-hero-copy">
                   <span className="nh-dark-label">
