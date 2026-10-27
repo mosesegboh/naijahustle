@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { usePlacement } from "./usePlacement";
+import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../stores/sessionStore";
 import "./commerce.css";
 type Ad = {
@@ -9,13 +10,20 @@ type Ad = {
   theme: string;
   status: string;
   impressions: number;
+  placement?: string;
   expiresAt?: number;
   amountKobo?: number;
 };
 type Summary = {
   admin: boolean;
   coins: number;
-  settings: { revision: number; koboPerCoin: number; adPriceKobo: number };
+  settings: {
+    revision: number;
+    koboPerCoin: number;
+    adPriceKobo: number;
+    racingAdPriceKobo: number;
+    festivalAdPriceKobo: number;
+  };
   paymentMode: string;
   checkoutEnabled: boolean;
   ads: Ad[];
@@ -26,39 +34,7 @@ const naira = (kobo: number) =>
     kobo / 100,
   );
 export function Billboard({ onOpen }: { onOpen: () => void }) {
-  const [ads, setAds] = useState<Ad[]>([]);
-  const [index, setIndex] = useState(0);
-  const ref = useRef<HTMLElement>(null);
-  const ad = ads[index % Math.max(1, ads.length)];
-  useEffect(() => {
-    void api("commerce/placements")
-      .then((d) => setAds(d.ads))
-      .catch(() => {});
-  }, []);
-  useEffect(() => {
-    const timer = setInterval(() => setIndex((i) => i + 1), 15000);
-    return () => clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    if (!ad || !ref.current) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        clearTimeout(timer);
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.5)
-          timer = setTimeout(() => {
-            if (document.visibilityState === "visible")
-              void api("commerce/impression", { id: ad.id }).catch(() => {});
-          }, 1000);
-      },
-      { threshold: 0.5 },
-    );
-    observer.observe(ref.current);
-    return () => {
-      observer.disconnect();
-      clearTimeout(timer);
-    };
-  }, [ad]);
+  const { ad, ref } = usePlacement("dashboard");
   return (
     <section
       ref={ref}
@@ -183,9 +159,10 @@ export default function Commerce() {
           <span className="nh-eyebrow">COMMUNITY BILLBOARD</span>
           <h2>Seven days in the spotlight.</h2>
           <p>
-            {naira(data.settings.adPriceKobo)} per approved advert. Placements
-            rotate on the signed-in dashboard for seven days from verified
-            payment.
+            Dashboard: {naira(data.settings.adPriceKobo)} · Street Kings:{" "}
+            {naira(data.settings.racingAdPriceKobo)} · Festival Rush:{" "}
+            {naira(data.settings.festivalAdPriceKobo)}. Placements rotate in
+            your selected location for seven days from verified payment.
           </p>
           <p>
             Payment mode: <strong>{data.paymentMode.toUpperCase()}</strong>.{" "}
@@ -227,6 +204,20 @@ export default function Commerce() {
           <textarea name="description" required minLength={5} maxLength={160} />
         </label>
         <label>
+          Advert location
+          <select
+            name="placement"
+            defaultValue={
+              new URLSearchParams(location.search).get("placement") ||
+              "dashboard"
+            }
+          >
+            <option value="dashboard">Dashboard</option>
+            <option value="racing">Street Kings — in-game banner</option>
+            <option value="festival">Festival Rush — in-game banner</option>
+          </select>
+        </label>
+        <label>
           Billboard palette
           <select name="theme">
             <option value="teal">Lagoon teal</option>
@@ -245,6 +236,7 @@ export default function Commerce() {
               <strong>{ad.title}</strong>
               <p>
                 {ad.status.replaceAll("_", " ")} · {ad.impressions} impressions
+                · {ad.placement || "dashboard"}
                 {ad.expiresAt
                   ? ` · ends ${new Date(ad.expiresAt).toLocaleDateString()}`
                   : ""}
@@ -260,7 +252,7 @@ export default function Commerce() {
               >
                 {data.paymentMode === "test"
                   ? "Test checkout"
-                  : `Pay ${naira(ad.amountKobo || data.settings.adPriceKobo)}`}
+                  : `Pay ${naira(ad.amountKobo || (ad.placement === "racing" ? data.settings.racingAdPriceKobo : ad.placement === "festival" ? data.settings.festivalAdPriceKobo : data.settings.adPriceKobo))}`}
               </button>
             )}
           </div>
@@ -317,6 +309,12 @@ export default function Commerce() {
                   revision: data.settings.revision,
                   koboPerCoin: Math.round(Number(f.get("rate")) * 100),
                   adPriceKobo: Math.round(Number(f.get("price")) * 100),
+                  racingAdPriceKobo: Math.round(
+                    Number(f.get("racingPrice")) * 100,
+                  ),
+                  festivalAdPriceKobo: Math.round(
+                    Number(f.get("festivalPrice")) * 100,
+                  ),
                 })
               )
                 setMessage("Settings saved. Cash redemption remains disabled.");
@@ -338,7 +336,7 @@ export default function Commerce() {
                 />
               </label>
               <label>
-                Seven-day advert price (NGN)
+                Seven-day dashboard advert price (NGN)
                 <input
                   name="price"
                   type="number"
@@ -347,6 +345,30 @@ export default function Commerce() {
                   step="0.01"
                   required
                   defaultValue={data.settings.adPriceKobo / 100}
+                />
+              </label>
+              <label>
+                Seven-day Street Kings price (NGN)
+                <input
+                  name="racingPrice"
+                  type="number"
+                  min="100"
+                  max="1000000"
+                  step="0.01"
+                  required
+                  defaultValue={data.settings.racingAdPriceKobo / 100}
+                />
+              </label>
+              <label>
+                Seven-day Festival Rush price (NGN)
+                <input
+                  name="festivalPrice"
+                  type="number"
+                  min="100"
+                  max="1000000"
+                  step="0.01"
+                  required
+                  defaultValue={data.settings.festivalAdPriceKobo / 100}
                 />
               </label>
             </div>
@@ -365,7 +387,9 @@ export default function Commerce() {
               <div className="nh-ad-order" key={ad.id}>
                 <div>
                   <strong>{ad.title}</strong>
-                  <p>{ad.description}</p>
+                  <p>
+                    {ad.description} · Location: {ad.placement || "dashboard"}
+                  </p>
                   <a href={ad.url} rel="noopener noreferrer" target="_blank">
                     {ad.url}
                   </a>

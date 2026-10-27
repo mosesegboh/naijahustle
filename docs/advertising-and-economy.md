@@ -29,3 +29,7 @@ References: [Flutterwave Standard](https://developer.flutterwave.com/docs/flutte
 ## Release review
 
 The scenery update adds market stalls, produce baskets, palms, lamps, waterfront boats, rooftop music equipment and background neighbours to Festival Rush, plus trackside kiosks, spectator groups, benches, pergolas and a central fountain to Street Kings. Static 3D props participate in the existing material batching. Decorative props do not add collision obstacles. Android-sized Chromium passed movement, control visibility and portrait/landscape checks in both games. These are desktop browser simulations, not physical-device measurements.
+
+## In-game placements
+
+Advertisers select Dashboard, Street Kings or Festival Rush. Each campaign belongs to exactly one location and each location has an admin-editable seven-day price (initially ₦5,000). Existing campaigns without a location remain dashboard-only. Server checkout uses the selected location’s price and freezes it on the order. In-game sponsored banners rotate every 15 seconds, refresh eligibility every minute, and link to the advertiser in a new tab. They are interface banners, not textures on 3D buildings. Multiplayer matches continue when an external tab opens. Game placement impressions follow the same visibility and daily de-duplication rules. Test-paid adverts remain excluded.

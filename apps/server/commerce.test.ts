@@ -165,4 +165,37 @@ describe("advertising and draft economy", () => {
     await f.call("impression", { id: "ad" }, "someone");
     expect((await f.store.ad("ad")).impressions).toBe(1);
   });
+  it("isolates game placements and uses their server-owned prices", async () => {
+    const f = fixture();
+    await f.call(
+      "settings",
+      {
+        revision: 0,
+        koboPerCoin: 0,
+        adPriceKobo: 500000,
+        racingAdPriceKobo: 900000,
+        festivalAdPriceKobo: 700000,
+      },
+      "admin",
+    );
+    expect(
+      (await f.call("ads", { ...f.draft, placement: "unknown" })).status,
+    ).toBe(400);
+    const { ad } = await f.call("ads", {
+      ...f.draft,
+      placement: "racing",
+      amountKobo: 1,
+    });
+    await f.call("review", { id: ad.id, decision: "approved" }, "admin");
+    await f.call("checkout", { id: ad.id });
+    expect(f.checkout().amount).toBe(9000);
+    await f.store.patchAd(ad.id, {}, { status: "active", expiresAt: 200000 });
+    expect((await f.call("placements/racing")).ads).toHaveLength(1);
+    expect((await f.call("placements/festival")).ads).toHaveLength(0);
+    expect((await f.call("placements")).ads).toHaveLength(0);
+    await f.call("impression", { id: ad.id, placement: "festival" }, "viewer");
+    expect((await f.store.ad(ad.id)).impressions).toBe(0);
+    await f.call("impression", { id: ad.id, placement: "racing" }, "viewer");
+    expect((await f.store.ad(ad.id)).impressions).toBe(1);
+  });
 });

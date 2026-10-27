@@ -3,6 +3,8 @@ export const DEFAULT_ECONOMY = {
   revision: 0,
   koboPerCoin: 0,
   adPriceKobo: 500000,
+  racingAdPriceKobo: 500000,
+  festivalAdPriceKobo: 500000,
 };
 export function commerceService(
   store,
@@ -36,7 +38,8 @@ export function commerceService(
       );
     return data.data;
   }
-  const publicAd = ({ id, title, description, url, theme }) => ({
+  const publicAd = ({ id, title, description, url, theme, expiresAt }) => ({
+    expiresAt,
     id,
     title,
     description,
@@ -45,7 +48,16 @@ export function commerceService(
   });
   return async ({ path, method, body, user, now, send }) => {
     if (!path.startsWith("/api/commerce/")) return false;
-    const settings = (await store.economy()) || DEFAULT_ECONOMY;
+    const settings = { ...DEFAULT_ECONOMY, ...(await store.economy()) };
+    const placements = ["dashboard", "racing", "festival"];
+    const price = (placement) =>
+      settings[
+        placement === "racing"
+          ? "racingAdPriceKobo"
+          : placement === "festival"
+            ? "festivalAdPriceKobo"
+            : "adPriceKobo"
+      ];
     const reply = (code, data) => {
       send(code, data);
       return true;
@@ -64,7 +76,15 @@ export function commerceService(
     if (path === "/api/commerce/settings" && method === "POST") {
       if (!admin(user))
         return reply(403, { error: "Administrator access required." });
+      const extra = {
+        racingAdPriceKobo: body.racingAdPriceKobo ?? settings.racingAdPriceKobo,
+        festivalAdPriceKobo:
+          body.festivalAdPriceKobo ?? settings.festivalAdPriceKobo,
+      };
       if (
+        !Object.values(extra).every(
+          (v) => Number.isSafeInteger(v) && v >= 10000 && v <= 100000000,
+        ) ||
         ![body.koboPerCoin, body.adPriceKobo, body.revision].every(
           Number.isSafeInteger,
         ) ||
@@ -77,6 +97,7 @@ export function commerceService(
           error: "Use whole kobo: rate 0–10,000; ad price ₦100–₦1,000,000.",
         });
       const ok = await store.saveEconomy({
+        ...extra,
         koboPerCoin: body.koboPerCoin,
         adPriceKobo: body.adPriceKobo,
         revision: body.revision,
@@ -108,7 +129,8 @@ export function commerceService(
         title.length > 55 ||
         description.length < 5 ||
         description.length > 160 ||
-        !["gold", "teal", "pink"].includes(body.theme)
+        !["gold", "teal", "pink"].includes(body.theme) ||
+        !placements.includes(body.placement ?? "dashboard")
       )
         return reply(400, {
           error:
@@ -128,6 +150,7 @@ export function commerceService(
         description,
         url: url.href,
         theme: body.theme,
+        placement: body.placement ?? "dashboard",
         status: "review",
         created: now,
         impressions: 0,
@@ -168,7 +191,7 @@ export function commerceService(
       if (ad.status === "approved") {
         const fields = {
           status: "payment_pending",
-          amountKobo: settings.adPriceKobo,
+          amountKobo: price(ad.placement),
           txRef: "nh-ad-" + ad.id,
           test: mode() === "test",
         };
@@ -192,7 +215,7 @@ export function commerceService(
           customer: { email: user.email, name: user.name },
           customizations: {
             title: "Naija Hustle advertising",
-            description: "Seven-day dashboard placement",
+            description: `Seven-day ${ad.placement ?? "dashboard"} placement`,
           },
         });
         const link = new URL(payment.link);
@@ -263,15 +286,31 @@ export function commerceService(
         });
       }
     }
-    if (path === "/api/commerce/placements" && method === "GET")
-      return reply(200, { ads: (await store.activeAds(now)).map(publicAd) });
+    if (
+      (path === "/api/commerce/placements" ||
+        path.startsWith("/api/commerce/placements/")) &&
+      method === "GET"
+    ) {
+      const placement =
+        path === "/api/commerce/placements"
+          ? "dashboard"
+          : path.split("/").at(-1);
+      if (!placements.includes(placement))
+        return reply(400, { error: "Unknown advertising placement." });
+      return reply(200, {
+        ads: (await store.activeAds(now, placement))
+          .filter((a) => (a.placement ?? "dashboard") === placement)
+          .map(publicAd),
+      });
+    }
     if (path === "/api/commerce/impression" && method === "POST") {
       const ad = await store.ad(String(body.id));
       if (
         !ad ||
         ad.status !== "active" ||
         ad.expiresAt <= now ||
-        ad.owner === user.id
+        ad.owner === user.id ||
+        (ad.placement ?? "dashboard") !== (body.placement ?? "dashboard")
       )
         return reply(200, { ok: true });
       await store.impression(ad.id, user.id, Math.floor(now / 86400000));

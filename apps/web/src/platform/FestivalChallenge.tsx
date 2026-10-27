@@ -313,7 +313,7 @@ export default function FestivalChallenge({
         <button onClick={() => (match ? void leave() : onExit())}>
           ← {match ? "Leave run" : "Dashboard"}
         </button>
-        <AdvertiseBanner game />
+        <AdvertiseBanner game placement="festival" />
         <b>✦ FESTIVAL RUSH</b>
       </header>
       {error && (

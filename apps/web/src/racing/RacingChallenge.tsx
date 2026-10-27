@@ -633,7 +633,7 @@ export default function RacingChallenge({
         </button>
       )}
       <div ref={mount} className="race-view" />
-      <AdvertiseBanner game />
+      <AdvertiseBanner game placement="racing" />
       <div
         ref={nameplate}
         className="race-nameplate"

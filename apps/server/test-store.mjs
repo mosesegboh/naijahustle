@@ -22,10 +22,13 @@ export function memoryStore() {
       copy([...ads.values()].filter((a) => a.owner === owner)),
     reviewAds: async () =>
       copy([...ads.values()].filter((a) => a.status === "review")),
-    activeAds: async (now) =>
+    activeAds: async (now, placement = "dashboard") =>
       copy(
         [...ads.values()].filter(
-          (a) => a.status === "active" && a.expiresAt > now,
+          (a) =>
+            a.status === "active" &&
+            a.expiresAt > now &&
+            (a.placement ?? "dashboard") === placement,
         ),
       ),
     createAd: async (ad) => {

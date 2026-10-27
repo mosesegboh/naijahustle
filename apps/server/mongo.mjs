@@ -70,9 +70,20 @@ export async function connectStore(
           .sort({ created: 1 })
           .limit(100)
           .toArray(),
-      activeAds: (now) =>
+      activeAds: (now, placement = "dashboard") =>
         ads
-          .find({ status: "active", expiresAt: { $gt: now } })
+          .find({
+            status: "active",
+            expiresAt: { $gt: now },
+            ...(placement === "dashboard"
+              ? {
+                  $or: [
+                    { placement: "dashboard" },
+                    { placement: { $exists: false } },
+                  ],
+                }
+              : { placement }),
+          })
           .limit(100)
           .toArray(),
       createAd: (ad) => ads.insertOne(ad),
