@@ -223,6 +223,7 @@ export default function RacingChallenge({
         elapsed = 0,
         frames = 0,
         report = 0,
+        slowWindows = 0,
         qualityApplied = "";
       const resize = () => {
         const { width, height } = host.getBoundingClientRect();
@@ -582,6 +583,18 @@ export default function RacingChallenge({
           });
           report = 0;
           if (elapsed > 1) {
+            if (
+              document.visibilityState === "visible" &&
+              qualityRef.current === "high" &&
+              frames / elapsed < 24
+            )
+              slowWindows++;
+            else slowWindows = 0;
+            if (slowWindows >= 3) {
+              qualityRef.current = "low";
+              setQuality("low");
+              slowWindows = 0;
+            }
             elapsed = 0;
             frames = 0;
           }

@@ -1,4 +1,6 @@
+import { refineKartGeometry } from "./refineKartGeometry";
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 export async function loadKart(weapon: "pulse" | "oil" | "shield" = "pulse") {
@@ -43,10 +45,10 @@ export async function loadKart(weapon: "pulse" | "oil" | "shield" = "pulse") {
   }
   const paint = new THREE.MeshPhysicalMaterial({
     color: 0xf4b92c,
-    metalness: 0.25,
-    roughness: 0.34,
-    clearcoat: 1,
-    clearcoatRoughness: 0.15,
+    metalness: 0.12,
+    roughness: 0.48,
+    clearcoat: 0.45,
+    clearcoatRoughness: 0.3,
   });
   // Retain the authored wheel geometry and the kart's UV detail; give its body lacquered paint.
   model.traverse((obj) => {
@@ -77,11 +79,11 @@ export async function loadKart(weapon: "pulse" | "oil" | "shield" = "pulse") {
       `
       #include <map_fragment>
       #ifdef USE_MAP
-        vec3 originalPaint = texture2D(map, vMapUv).rgb;
+        vec3 originalPaint = sampledDiffuseColor.rgb;
         if (originalPaint.g > originalPaint.r * 1.15 && originalPaint.g > originalPaint.b * 1.01) {
           diffuseColor.rgb = diffuse * (.7 + originalPaint.g * .3);
         } else {
-          diffuseColor.rgb = originalPaint * .3;
+          diffuseColor.rgb = mix(vec3(.065,.075,.085), originalPaint * .38, .6);
         }
       #endif
     `,
@@ -106,7 +108,7 @@ export async function loadKart(weapon: "pulse" | "oil" | "shield" = "pulse") {
   steering.rotation.x = -0.45;
   root.add(steering);
   const driver = driverAsset.scene;
-  driver.scale.setScalar(1.12);
+  driver.scale.setScalar(1.06);
   root.add(driver);
   driver.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(driver),
@@ -155,7 +157,7 @@ export async function loadKart(weapon: "pulse" | "oil" | "shield" = "pulse") {
       let c = isSkin ? skin : y < 0.46 ? pants : green;
       if (/hand|index|middle|ring|pinky|thumb/i.test(boneName)) c = pants;
       if (y > 0.46 && y < 0.51) c = gold;
-      if (y > 0.51 && y < 0.79 && Math.abs(point.x) < 0.06) c = white;
+      if (y > 0.51 && y < 0.79 && Math.abs(point.x) < 0.025) c = white;
       colors.push(c.r, c.g, c.b);
       outfitUV.push(point.x, point.y);
     }
@@ -172,29 +174,6 @@ export async function loadKart(weapon: "pulse" | "oil" | "shield" = "pulse") {
       roughness: 0.7,
       metalness: 0.02,
     });
-    fabric.onBeforeCompile = (shader) => {
-      shader.vertexShader =
-        "attribute vec2 outfitUV; varying vec2 vOutfitUV;\n" +
-        shader.vertexShader;
-      shader.vertexShader = shader.vertexShader.replace(
-        "#include <begin_vertex>",
-        "#include <begin_vertex>\nvOutfitUV = outfitUV;",
-      );
-      shader.fragmentShader =
-        "varying vec2 vOutfitUV;\n" + shader.fragmentShader;
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <color_fragment>",
-        `
-        #include <color_fragment>
-        if (diffuseColor.g > diffuseColor.r * 1.8 && diffuseColor.g > diffuseColor.b * 1.1 && abs(vOutfitUV.x) > .12) {
-          vec2 tile = fract(vOutfitUV * 15.0);
-          float diamond = abs(tile.x - .5) + abs(tile.y - .5);
-          float band = step(.28, diamond) * (1.0 - step(.37, diamond));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.92,.46,.045), band * .85);
-        }
-      `,
-      );
-    };
     obj.material = fabric;
   });
   // Pose the authored skeleton in world space so the driver sits and holds the wheel.
@@ -245,40 +224,148 @@ export async function loadKart(weapon: "pulse" | "oil" | "shield" = "pulse") {
   }
   const head = driver.getObjectByName("Head");
   if (head) {
-    head.scale.multiplyScalar(1.25);
-    const helmet = new THREE.Mesh(
-      new THREE.SphereGeometry(
-        0.148,
-        24,
-        16,
-        0,
-        Math.PI * 2,
-        0,
-        Math.PI * 0.47,
-      ),
-      new THREE.MeshPhysicalMaterial({
-        color: 0x088e83,
-        roughness: 0.32,
-        clearcoat: 0.6,
-      }),
+    // Fit the cap to the posed mesh, not a guessed offset in the bone's local axes.
+    driver.updateMatrixWorld(true);
+    const headBounds = new THREE.Box3();
+    driver.traverse((object) => {
+      if (
+        !(object instanceof THREE.SkinnedMesh) ||
+        object.name !== "SuperHero_Male"
+      )
+        return;
+      object.skeleton.update();
+      const positions = object.geometry.getAttribute("position"),
+        joints = object.geometry.getAttribute("skinIndex"),
+        weights = object.geometry.getAttribute("skinWeight");
+      for (let i = 0; i < positions.count; i++) {
+        let weight = 0;
+        for (let k = 0; k < 4; k++)
+          if (
+            /^head$/i.test(
+              object.skeleton.bones[joints.getComponent(i, k)]?.name || "",
+            )
+          )
+            weight += weights.getComponent(i, k);
+        if (weight < 0.7) continue;
+        const point = new THREE.Vector3().fromBufferAttribute(positions, i);
+        object.applyBoneTransform(i, point);
+        object.localToWorld(point);
+        headBounds.expandByPoint(point);
+      }
+    });
+    if (!headBounds.isEmpty()) {
+      const size = headBounds.getSize(new THREE.Vector3()),
+        center = headBounds.getCenter(new THREE.Vector3());
+      const cap = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
+        new THREE.MeshStandardMaterial({ color: 0x173b38, roughness: 0.85 }),
+      );
+      cap.scale.set(size.x * 0.54, size.y * 0.23, size.z * 0.54);
+      cap.position.set(center.x, headBounds.max.y - size.y * 0.16, center.z);
+      root.add(cap);
+      head.attach(cap);
+      cap.castShadow = true;
+      const brim = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 20, 8),
+        cap.material,
+      );
+      brim.scale.set(size.x * 0.58, 0.014, size.z * 0.4);
+      brim.position.set(
+        center.x,
+        headBounds.max.y - size.y * 0.16,
+        headBounds.max.z - 0.01,
+      );
+      root.add(brim);
+      head.attach(brim);
+    }
+  }
+  // Turned rubber tyres and alloy hubs replace the chunky atlas-coloured wheels.
+  const rubber = new THREE.MeshStandardMaterial({
+    color: 0x20252a,
+    roughness: 0.94,
+  });
+  const alloy = new THREE.MeshStandardMaterial({
+    color: 0xb1bac1,
+    metalness: 0.72,
+    roughness: 0.35,
+  });
+  model.traverse((wheel) => {
+    if (!(wheel instanceof THREE.Mesh) || !wheel.name.startsWith("wheel-"))
+      return;
+    const side = wheel.name.endsWith("left") ? 1 : -1;
+    const profile = [
+      new THREE.Vector2(0.125, -0.105),
+      new THREE.Vector2(0.18, -0.1),
+      new THREE.Vector2(0.205, -0.075),
+      new THREE.Vector2(0.211, -0.045),
+      new THREE.Vector2(0.211, 0.045),
+      new THREE.Vector2(0.205, 0.075),
+      new THREE.Vector2(0.18, 0.1),
+      new THREE.Vector2(0.125, 0.105),
+    ];
+    wheel.geometry.dispose();
+    wheel.geometry = new THREE.LatheGeometry(profile, 32)
+      .rotateZ(Math.PI / 2)
+      .translate(side * 0.105, 0, 0);
+    wheel.material = rubber;
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.125, 0.018, 6, 24),
+      alloy,
     );
-    helmet.position.set(0, 0.175, 0);
-    helmet.castShadow = true;
-    head.add(helmet);
-    const helmetStripe = new THREE.Mesh(
-      new THREE.SphereGeometry(
-        0.149,
-        16,
-        16,
-        Math.PI * 1.46,
-        0.24,
-        0,
-        Math.PI * 0.47,
-      ),
-      new THREE.MeshStandardMaterial({ color: 0xffe5a0, roughness: 0.35 }),
+    rim.rotation.y = Math.PI / 2;
+    rim.position.x = side * 0.211;
+    wheel.add(rim);
+    const hub: THREE.Mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.047, 0.047, 0.035, 16),
+      alloy,
     );
-    helmetStripe.position.copy(helmet.position);
-    head.add(helmetStripe);
+    hub.rotation.z = Math.PI / 2;
+    hub.position.x = side * 0.208;
+    wheel.add(hub);
+    hub.updateMatrix();
+    const hubParts: THREE.BufferGeometry[] = [
+      hub.geometry.clone().applyMatrix4(hub.matrix),
+    ];
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * Math.PI * 2) / 5;
+      hubParts.push(
+        new THREE.BoxGeometry(0.016, 0.1, 0.022)
+          .rotateX(angle)
+          .translate(
+            side * 0.208,
+            Math.cos(angle) * 0.073,
+            Math.sin(angle) * 0.073,
+          ),
+      );
+    }
+    const combined = mergeGeometries(hubParts);
+    if (combined) {
+      hub.geometry.dispose();
+      hub.geometry = combined;
+      hub.position.set(0, 0, 0);
+      hub.rotation.set(0, 0, 0);
+    }
+    for (const geometry of hubParts) geometry.dispose();
+  });
+  // glTF can wrap a named body in a Group when that node also has children.
+  model.traverse((shell) => {
+    if (!(shell instanceof THREE.Mesh) || shell.material !== paint) return;
+    refineKartGeometry(shell.geometry);
+  });
+  const lampMaterial = new THREE.MeshStandardMaterial({
+    color: 0xfff3c6,
+    emissive: 0xffd885,
+    emissiveIntensity: 0.25,
+    roughness: 0.28,
+  });
+  for (const side of [-1, 1]) {
+    const lamp = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, 16, 8),
+      lampMaterial,
+    );
+    lamp.scale.set(1, 0.55, 0.4);
+    lamp.position.set(side * 0.57, 0.55, 1.52);
+    root.add(lamp);
   }
   const frontWheels = [
     model.getObjectByName("wheel-front-left"),

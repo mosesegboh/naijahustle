@@ -11,13 +11,13 @@ export function buildEnvironment(
     room = new RoomEnvironment();
   const env = pmrem.fromScene(room, 0.04, 0.1, 100, { size: 64 });
   scene.environment = env.texture;
-  scene.environmentIntensity = 0.65;
+  scene.environmentIntensity = 0.4;
   room.dispose();
   pmrem.dispose();
   scene.background = new THREE.Color("#91d6f0");
   scene.fog = new THREE.Fog("#91d6f0", 170, 420);
-  scene.add(new THREE.HemisphereLight(0xd6efff, 0xd1ae73, 1.3));
-  const sun = new THREE.DirectionalLight(0xffedc5, 3.3);
+  scene.add(new THREE.HemisphereLight(0xd6efff, 0x82715f, 1.05));
+  const sun = new THREE.DirectionalLight(0xffeddb, 2.4);
   sun.position.set(-40, 65, 35);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -35,6 +35,36 @@ export function buildEnvironment(
     if (!materials.has(key))
       materials.set(key, new THREE.MeshStandardMaterial({ color, roughness }));
     return materials.get(key)!;
+  };
+  const plasterCanvas = document.createElement("canvas");
+  plasterCanvas.width = plasterCanvas.height = 128;
+  const plasterContext = plasterCanvas.getContext("2d")!;
+  plasterContext.fillStyle = "#e5e2d9";
+  plasterContext.fillRect(0, 0, 128, 128);
+  let plasterSeed = 23;
+  for (let i = 0; i < 6000; i++) {
+    plasterSeed = (plasterSeed * 16807) % 2147483647;
+    const x = plasterSeed % 128;
+    plasterSeed = (plasterSeed * 16807) % 2147483647;
+    plasterContext.fillStyle = i % 3 ? "#bdb9ad20" : "#ffffff35";
+    plasterContext.fillRect(x, plasterSeed % 128, 1, 1);
+  }
+  const plaster = new THREE.CanvasTexture(plasterCanvas);
+  plaster.wrapS = plaster.wrapT = THREE.RepeatWrapping;
+  plaster.repeat.set(4, 4);
+  plaster.colorSpace = THREE.SRGBColorSpace;
+  const walls = new Map<number, THREE.MeshStandardMaterial>();
+  const wall = (color: number) => {
+    if (!walls.has(color))
+      walls.set(
+        color,
+        new THREE.MeshStandardMaterial({
+          color,
+          map: plaster,
+          roughness: 0.96,
+        }),
+      );
+    return walls.get(color)!;
   };
   const sand = material(0xf1d297),
     pavement = material(0xe0bd96),
@@ -313,11 +343,13 @@ export function buildEnvironment(
     scene.add(group);
     const h = 7 + (i % 4) * 2.3,
       w = 8 + (i % 3),
-      facade = material(colors[i % colors.length]);
+      facade = wall(
+        [0xd7ad83, 0xbfc9af, 0xc8a8ae, 0x88aca9, 0xdcc59d, 0xa5acc6][i % 6],
+      );
     box(w, h, 7, facade, 0, h / 2, 0, group);
     box(w + 0.5, 0.38, 7.5, white, 0, h, 0, group);
     box(w + 0.35, 0.2, 7.3, material(0xffdc95), 0, 3.3, 0, group);
-    if (i % 3 === 0) {
+    if (i % 8 === 0) {
       const dome = new THREE.Mesh(
         new THREE.SphereGeometry(w * 0.42, 24, 12, 0, TAU, 0, Math.PI / 2),
         material(0xd6654e),
@@ -327,30 +359,148 @@ export function buildEnvironment(
       dome.castShadow = true;
       group.add(dome);
     } else {
+      const roofShape = new THREE.Shape();
+      roofShape.moveTo(-w / 2 - 0.4, 0);
+      roofShape.lineTo(0, 1.9);
+      roofShape.lineTo(w / 2 + 0.4, 0);
+      roofShape.closePath();
       const roof = new THREE.Mesh(
-        new THREE.CylinderGeometry(w * 0.48, w * 0.58, 0.85, 4),
-        material(i % 2 ? 0xcb6959 : 0x3c8f9b),
+        new THREE.ExtrudeGeometry(roofShape, {
+          depth: 7.8,
+          bevelEnabled: false,
+        }),
+        material(i % 2 ? 0x8b5849 : 0x53636c),
       );
-      roof.rotation.y = Math.PI / 4;
-      roof.position.y = h + 0.55;
-      roof.scale.z = 0.8;
+      roof.position.set(0, h + 0.1, -3.9);
+      roof.castShadow = true;
       group.add(roof);
+      for (let seam = 0; seam < 12; seam++) {
+        const z = -3.8 + seam * 0.7;
+        for (const side of [-1, 1]) {
+          const rib = box(
+            Math.hypot(w / 2 + 0.4, 1.9),
+            0.04,
+            0.045,
+            material(0xa99580),
+            side * (w / 4 + 0.2),
+            h + 1.05,
+            z,
+            group,
+          );
+          rib.rotation.z = -side * Math.atan2(1.9, w / 2 + 0.4);
+        }
+      }
+    }
+    // Foundation, corner pilasters, side windows and utilities give the facades depth.
+    box(w + 0.08, 0.65, 7.08, material(0x887c6c), 0, 0.32, 0, group);
+    for (const side of [-1, 1]) {
+      box(0.22, h, 0.22, white, side * (w / 2 - 0.1), h / 2, 3.53, group);
+      box(
+        0.1,
+        h,
+        0.1,
+        material(0x667477),
+        side * (w / 2 + 0.1),
+        h / 2,
+        -3.1,
+        group,
+      );
+      for (let floor = 0; floor < Math.floor(h / 3); floor++)
+        for (const z of [-1.8, 1.5]) {
+          box(
+            0.14,
+            1.7,
+            1.45,
+            white,
+            side * (w / 2 + 0.03),
+            1.7 + floor * 2.8,
+            z,
+            group,
+          );
+          box(
+            0.16,
+            1.42,
+            1.15,
+            material(0x314a55, 0.4),
+            side * (w / 2 + 0.12),
+            1.7 + floor * 2.8,
+            z,
+            group,
+          );
+          box(
+            0.17,
+            0.06,
+            1.15,
+            white,
+            side * (w / 2 + 0.15),
+            1.7 + floor * 2.8,
+            z,
+            group,
+          );
+        }
+      box(
+        0.5,
+        0.65,
+        0.7,
+        material(0xc4c2b5),
+        side * (w / 2 + 0.3),
+        2.8,
+        -0.2,
+        group,
+      );
     }
     for (let floor = 0; floor < Math.floor(h / 3); floor++)
       for (let column = 0; column < 3; column++) {
         const xx = -w * 0.31 + column * w * 0.31,
           yy = 0.8 + floor * 2.8;
-        arch(1.65, 2, 0.08, white, xx, yy, 3.51, group);
-        arch(
-          1.35,
-          1.73,
-          0.09,
-          material(0x28566f, 0.3),
-          xx,
-          yy + 0.12,
-          3.62,
-          group,
-        );
+        if (i % 2) {
+          box(1.65, 2, 0.12, white, xx, yy + 1, 3.51, group);
+          box(
+            1.35,
+            1.73,
+            0.13,
+            material(0x28566f, 0.4),
+            xx,
+            yy + 1,
+            3.62,
+            group,
+          );
+          for (const side of [-1, 1]) {
+            box(
+              0.38,
+              1.9,
+              0.12,
+              material(0x496d64),
+              xx + side * 1.02,
+              yy + 1,
+              3.65,
+              group,
+            );
+            for (let slat = 0; slat < 7; slat++)
+              box(
+                0.3,
+                0.035,
+                0.05,
+                white,
+                xx + side * 1.02,
+                yy + 0.3 + slat * 0.22,
+                3.74,
+                group,
+              );
+          }
+        } else {
+          arch(1.65, 2, 0.08, white, xx, yy, 3.51, group);
+          arch(
+            1.35,
+            1.73,
+            0.09,
+            material(0x28566f, 0.3),
+            xx,
+            yy + 0.12,
+            3.62,
+            group,
+          );
+        }
         box(0.06, 1.3, 0.07, white, xx, yy + 0.83, 3.77, group);
         if (floor > 0) {
           box(1.95, 0.16, 0.85, white, xx, yy - 0.12, 3.95, group);
@@ -704,42 +854,53 @@ export function buildEnvironment(
       const person = new THREE.Group();
       person.position.set(-2 + k * 1.7, 0, 3);
       pocket.add(person);
-      box(
-        0.43,
-        0.7,
-        0.3,
-        material(colors[(i + k + 2) % 6]),
-        0,
-        1.05,
-        0,
-        person,
+      const skin = material([0x875636, 0x603d2d, 0xa77352][(i + k) % 3]);
+      const shirt = material(
+        [0xb16c52, 0x447e79, 0xd0b26c, 0x696993][(i + k) % 4],
       );
-      for (const side of [-1, 1]) {
-        box(0.14, 0.65, 0.16, dark, side * 0.13, 0.38, 0, person);
-        const arm = box(
-          0.12,
-          0.6,
-          0.14,
-          material(0x875636),
-          side * 0.3,
-          1.1,
-          0,
-          person,
+      function limb(
+        radius: number,
+        length: number,
+        x: number,
+        y: number,
+        z: number,
+        mat: THREE.Material,
+      ) {
+        const mesh = new THREE.Mesh(
+          new THREE.CapsuleGeometry(radius, length, 4, 8),
+          mat,
         );
-        arm.rotation.z = side * 0.28;
+        mesh.position.set(x, y, z);
+        person.add(mesh);
+        return mesh;
       }
-      const head = new THREE.Mesh(
-        new THREE.SphereGeometry(0.24, 10, 8),
-        material(0x875636),
-      );
-      head.position.y = 1.65;
+      const torso = limb(0.21, 0.32, 0, 1.05, 0, shirt);
+      torso.scale.z = 0.72;
+      for (const side of [-1, 1]) {
+        limb(0.075, 0.53, side * 0.12, 0.4, 0, dark);
+        box(0.18, 0.12, 0.3, dark, side * 0.12, 0.07, 0.065, person);
+        const sleeve = limb(0.08, 0.16, side * 0.26, 1.14, 0, shirt);
+        sleeve.rotation.z = side * 0.2;
+        const forearm = limb(0.055, 0.22, side * 0.3, 0.87, 0.04, skin);
+        forearm.rotation.z = side * 0.1;
+      }
+      limb(0.07, 0.1, 0, 1.42, 0, skin);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), skin);
+      head.scale.set(0.9, 1.18, 0.96);
+      head.position.y = 1.64;
       person.add(head);
       const hair = new THREE.Mesh(
-        new THREE.SphereGeometry(0.25, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.SphereGeometry(0.173, 12, 8, 0, TAU, 0, Math.PI * 0.52),
         dark,
       );
-      hair.position.y = 1.68;
+      hair.scale.set(0.92, 1.12, 1);
+      hair.position.y = 1.7;
       person.add(hair);
+      for (const side of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4), dark);
+        eye.position.set(side * 0.06, 1.66, 0.151);
+        person.add(eye);
+      }
     }
   }
   // A sculptural lagoon fountain gives the central island a recognisable landmark.
